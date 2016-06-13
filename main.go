@@ -22,10 +22,12 @@ const (
 )
 
 const (
-	TempDir = "/var/tmp"
+	TempDir = "/var/tmp" // 'tmpfs /var/tmp tmpfs nodev,nosuid,size=10M 0 0' in /etc/fstab
 
 	MinImageWidth  = 400
 	MinImageHeight = 300
+
+	NumQueue = 4
 )
 
 type Session struct {
@@ -33,9 +35,21 @@ type Session struct {
 	CurrentStatus Status
 }
 
+// session pool for storing individual statuses
 type SessionPool struct {
 	Sessions map[string]Session
 	sync.Mutex
+}
+
+// for making sure the camera is not used simultaneously
+var cameraLock sync.Mutex
+
+type CaptureRequest struct {
+	ChatId      interface{}
+	Directory   string
+	ImageWidth  int
+	ImageHeight int
+	Options     map[string]interface{}
 }
 
 // variables
@@ -45,6 +59,7 @@ var isVerbose bool
 var availableIds []string
 var imageWidth, imageHeight int
 var pool SessionPool
+var captureChannel chan CaptureRequest
 var launched time.Time
 
 // keyboards
@@ -78,7 +93,7 @@ func init() {
 			imageHeight = MinImageHeight
 		}
 
-		// initialize variables
+		// initialize session variables
 		sessions := make(map[string]Session)
 		for _, v := range availableIds {
 			sessions[v] = Session{
@@ -89,6 +104,9 @@ func init() {
 		pool = SessionPool{
 			Sessions: sessions,
 		}
+
+		// channels
+		captureChannel = make(chan CaptureRequest, NumQueue)
 	} else {
 		panic(err.Error())
 	}
@@ -183,6 +201,9 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 		}
 
 		if len(message) > 0 {
+			// 'typing...'
+			b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
+
 			// send message
 			if sent := b.SendMessage(update.Message.Chat.Id, &message, options); sent.Ok {
 				result = true
@@ -190,31 +211,51 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				log.Printf("*** Failed to send message: %s\n", *sent.Description)
 			}
 		} else {
-			// 'typing...'
-			b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
-
-			// send photo
-			if filepath, err := helper.CaptureRaspiStill(TempDir, imageWidth, imageHeight); err == nil {
-				// 'uploading photo...'
-				b.SendChatAction(update.Message.Chat.Id, bot.ChatActionUploadPhoto)
-
-				// send photo
-				if sent := b.SendPhoto(update.Message.Chat.Id, &filepath, options); sent.Ok {
-					if err := os.Remove(filepath); err != nil {
-						log.Printf("*** Failed to delete temp file: %s\n", err)
-					}
-					result = true
-				} else {
-					log.Printf("*** Failed to send photo: %s\n", *sent.Description)
-				}
-			} else {
-				log.Printf("*** Image capture failed: %s\n", err)
+			// push to capture request channel
+			captureChannel <- CaptureRequest{
+				ChatId:      update.Message.Chat.Id,
+				Directory:   TempDir,
+				ImageWidth:  imageWidth,
+				ImageHeight: imageHeight,
+				Options:     options,
 			}
 		}
 	} else {
 		log.Printf("*** Session does not exist for id: %s\n", userId)
 	}
 	pool.Unlock()
+
+	return result
+}
+
+// process capture request
+func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
+	// process result
+	result := false
+
+	cameraLock.Lock()
+	defer cameraLock.Unlock()
+
+	// 'typing...'
+	b.SendChatAction(request.ChatId, bot.ChatActionTyping)
+
+	// send photo
+	if filepath, err := helper.CaptureRaspiStill(request.Directory, request.ImageWidth, request.ImageHeight); err == nil {
+		// 'uploading photo...'
+		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
+
+		// send photo
+		if sent := b.SendPhoto(request.ChatId, &filepath, request.Options); sent.Ok {
+			if err := os.Remove(filepath); err != nil {
+				log.Printf("*** Failed to delete temp file: %s\n", err)
+			}
+			result = true
+		} else {
+			log.Printf("*** Failed to send photo: %s\n", *sent.Description)
+		}
+	} else {
+		log.Printf("*** Image capture failed: %s\n", err)
+	}
 
 	return result
 }
@@ -229,6 +270,17 @@ func main() {
 
 		// delete webhook (getting updates will not work when wehbook is set up)
 		if unhooked := client.DeleteWebhook(); unhooked.Ok {
+			// monitor request capture channel
+			go func() {
+				for {
+					select {
+					case request := <-captureChannel:
+						// do capture and send response
+						processCaptureRequest(client, request)
+					}
+				}
+			}()
+
 			// wait for new updates
 			client.StartMonitoringUpdates(0, monitorInterval, func(b *bot.Bot, update bot.Update, err error) {
 				if err == nil {
