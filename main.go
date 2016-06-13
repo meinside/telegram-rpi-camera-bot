@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +22,7 @@ const (
 )
 
 const (
-	RaspiStillBin = "/usr/bin/raspistill"
-	TempDir       = "/var/tmp"
+	TempDir = "/var/tmp"
 
 	MinImageWidth  = 400
 	MinImageHeight = 300
@@ -197,7 +194,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
 
 			// send photo
-			if filepath, err := captureRaspiStill(imageWidth, imageHeight); err == nil {
+			if filepath, err := helper.CaptureRaspiStill(TempDir, imageWidth, imageHeight); err == nil {
 				// 'uploading photo...'
 				b.SendChatAction(update.Message.Chat.Id, bot.ChatActionUploadPhoto)
 
@@ -220,21 +217,6 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	pool.Unlock()
 
 	return result
-}
-
-func captureRaspiStill(width, height int) (filepath string, err error) {
-	filepath = fmt.Sprintf("%s/captured_%d.jpg", TempDir, time.Now().UnixNano()/int64(time.Millisecond))
-	if bytes, err := exec.Command(
-		RaspiStillBin,
-		"-w", strconv.Itoa(width),
-		"-h", strconv.Itoa(height),
-		"-o", filepath).CombinedOutput(); err != nil {
-
-		log.Printf("*** Error running %s: %s\n", RaspiStillBin, string(bytes))
-		return "", err
-	} else {
-		return filepath, nil
-	}
 }
 
 func main() {

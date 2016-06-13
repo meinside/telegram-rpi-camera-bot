@@ -4,15 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 )
 
 const (
 	// constants for config
 	ConfigFilename = "../config.json"
+
+	// absolute path of raspistill
+	RaspiStillBin = "/usr/bin/raspistill"
 )
 
 // struct for config file
@@ -59,4 +65,21 @@ func GetMemoryUsage() (usage string) {
 	runtime.ReadMemStats(m)
 
 	return fmt.Sprintf("Sys: *%.1f MB*, Heap: *%.1f MB*", float32(m.Sys)/1024/1024, float32(m.HeapAlloc)/1024/1024)
+}
+
+// capture an image with given width and height,
+// return the captured image's filepath (for deleting it after use)
+func CaptureRaspiStill(directory string, width, height int) (filepath string, err error) {
+	filepath = fmt.Sprintf("%s/captured_%d.jpg", directory, time.Now().UnixNano()/int64(time.Millisecond))
+	if bytes, err := exec.Command(
+		RaspiStillBin,
+		"-w", strconv.Itoa(width),
+		"-h", strconv.Itoa(height),
+		"-o", filepath).CombinedOutput(); err != nil {
+
+		log.Printf("*** Error running %s: %s\n", RaspiStillBin, string(bytes))
+		return "", err
+	} else {
+		return filepath, nil
+	}
 }
