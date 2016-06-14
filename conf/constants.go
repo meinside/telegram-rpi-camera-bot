@@ -4,6 +4,10 @@ const (
 	// for monitoring
 	DefaultMonitorIntervalSeconds = 3
 
+	// variables
+	MinImageWidth  = 400
+	MinImageHeight = 300
+
 	// commands
 	CommandStart   = "/start"
 	CommandCapture = "/capture"

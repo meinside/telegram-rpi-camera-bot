@@ -24,9 +24,6 @@ const (
 const (
 	TempDir = "/var/tmp" // 'tmpfs /var/tmp tmpfs nodev,nosuid,size=10M 0 0' in /etc/fstab
 
-	MinImageWidth  = 400
-	MinImageHeight = 300
-
 	NumQueue = 4
 )
 
@@ -85,12 +82,12 @@ func init() {
 		}
 		isVerbose = config.IsVerbose
 		imageWidth = config.ImageWidth
-		if imageWidth < MinImageWidth {
-			imageWidth = MinImageWidth
+		if imageWidth < conf.MinImageWidth {
+			imageWidth = conf.MinImageWidth
 		}
 		imageHeight = config.ImageHeight
-		if imageHeight < MinImageHeight {
-			imageHeight = MinImageHeight
+		if imageHeight < conf.MinImageHeight {
+			imageHeight = conf.MinImageHeight
 		}
 
 		// initialize session variables
