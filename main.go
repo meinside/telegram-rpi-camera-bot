@@ -42,11 +42,12 @@ type SessionPool struct {
 var cameraLock sync.Mutex
 
 type CaptureRequest struct {
-	ChatId      interface{}
-	Directory   string
-	ImageWidth  int
-	ImageHeight int
-	Options     map[string]interface{}
+	ChatId         interface{}
+	Directory      string
+	ImageWidth     int
+	ImageHeight    int
+	CameraParams   map[string]interface{}
+	MessageOptions map[string]interface{}
 }
 
 // variables
@@ -55,6 +56,7 @@ var monitorInterval int
 var isVerbose bool
 var availableIds []string
 var imageWidth, imageHeight int
+var cameraParams map[string]interface{}
 var pool SessionPool
 var captureChannel chan CaptureRequest
 var launched time.Time
@@ -81,6 +83,8 @@ func init() {
 			monitorInterval = conf.DefaultMonitorIntervalSeconds
 		}
 		isVerbose = config.IsVerbose
+
+		// image width * height
 		imageWidth = config.ImageWidth
 		if imageWidth < conf.MinImageWidth {
 			imageWidth = conf.MinImageWidth
@@ -89,6 +93,9 @@ func init() {
 		if imageHeight < conf.MinImageHeight {
 			imageHeight = conf.MinImageHeight
 		}
+
+		// other camera params
+		cameraParams = config.CameraParams
 
 		// initialize session variables
 		sessions := make(map[string]Session)
@@ -210,11 +217,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 		} else {
 			// push to capture request channel
 			captureChannel <- CaptureRequest{
-				ChatId:      update.Message.Chat.Id,
-				Directory:   TempDir,
-				ImageWidth:  imageWidth,
-				ImageHeight: imageHeight,
-				Options:     options,
+				ChatId:         update.Message.Chat.Id,
+				Directory:      TempDir,
+				ImageWidth:     imageWidth,
+				ImageHeight:    imageHeight,
+				CameraParams:   cameraParams,
+				MessageOptions: options,
 			}
 		}
 	} else {
@@ -237,12 +245,12 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 	b.SendChatAction(request.ChatId, bot.ChatActionTyping)
 
 	// send photo
-	if filepath, err := helper.CaptureRaspiStill(request.Directory, request.ImageWidth, request.ImageHeight); err == nil {
+	if filepath, err := helper.CaptureRaspiStill(request.Directory, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
 		// 'uploading photo...'
 		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatId, &filepath, request.Options); sent.Ok {
+		if sent := b.SendPhoto(request.ChatId, &filepath, request.MessageOptions); sent.Ok {
 			if err := os.Remove(filepath); err != nil {
 				log.Printf("*** Failed to delete temp file: %s\n", err)
 			}

@@ -8,5 +8,10 @@
 	"monitor_interval": 3,
 	"image_width": 1600,
 	"image_height": 1200,
+	"camera_params": {
+		"--brightness": 50,
+		"--quality": 90,
+		"--hflip": nil
+	},
 	"is_verbose": false
 }

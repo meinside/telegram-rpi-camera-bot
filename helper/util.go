@@ -23,12 +23,13 @@ const (
 
 // struct for config file
 type Config struct {
-	ApiToken        string   `json:"api_token"`
-	AvailableIds    []string `json:"available_ids"`
-	MonitorInterval int      `json:"monitor_interval"`
-	ImageWidth      int      `json:"image_width"`
-	ImageHeight     int      `json:"image_height"`
-	IsVerbose       bool     `json:"is_verbose"`
+	ApiToken        string                 `json:"api_token"`
+	AvailableIds    []string               `json:"available_ids"`
+	MonitorInterval int                    `json:"monitor_interval"`
+	ImageWidth      int                    `json:"image_width"`
+	ImageHeight     int                    `json:"image_height"`
+	CameraParams    map[string]interface{} `json:"camera_params"`
+	IsVerbose       bool                   `json:"is_verbose"`
 }
 
 // Read config
@@ -67,16 +68,27 @@ func GetMemoryUsage() (usage string) {
 	return fmt.Sprintf("Sys: *%.1f MB*, Heap: *%.1f MB*", float32(m.Sys)/1024/1024, float32(m.HeapAlloc)/1024/1024)
 }
 
-// capture an image with given width and height,
+// capture an image with given width, height, and other parameters
 // return the captured image's filepath (for deleting it after use)
-func CaptureRaspiStill(directory string, width, height int) (filepath string, err error) {
+func CaptureRaspiStill(directory string, width, height int, cameraParams map[string]interface{}) (filepath string, err error) {
+	// filepath
 	filepath = fmt.Sprintf("%s/captured_%d.jpg", directory, time.Now().UnixNano()/int64(time.Millisecond))
-	if bytes, err := exec.Command(
-		RaspiStillBin,
+
+	// command line arguments
+	args := []string{
 		"-w", strconv.Itoa(width),
 		"-h", strconv.Itoa(height),
-		"-o", filepath).CombinedOutput(); err != nil {
+		"-o", filepath,
+	}
+	for k, v := range cameraParams {
+		args = append(args, k)
+		if v != nil {
+			args = append(args, fmt.Sprintf("%v", v))
+		}
+	}
 
+	// execute command
+	if bytes, err := exec.Command(RaspiStillBin, args...).CombinedOutput(); err != nil {
 		log.Printf("*** Error running %s: %s\n", RaspiStillBin, string(bytes))
 		return "", err
 	} else {
