@@ -9,6 +9,7 @@
 	"image_width": 1600,
 	"image_height": 1200,
 	"camera_params": {
+		"--timeout": 1,
 		"--brightness": 50,
 		"--quality": 90,
 		"--hflip": nil
