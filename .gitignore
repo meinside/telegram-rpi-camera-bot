@@ -1,4 +1,5 @@
 *.swp
-telegrambot
+
+telegram-bot-rpi-camera
 
 config.json

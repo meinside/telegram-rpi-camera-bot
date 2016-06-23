@@ -35,13 +35,13 @@ and edit values to yours:
 ## 2. Build and run
 
 ```bash
-$ go build -o telegrambot main.go
+$ go build
 ```
 
 and run it:
 
 ```bash
-$ ./telegrambot
+$ ./telegram-bot-rpi-camera
 ```
 
 ## 3. Run as a service
