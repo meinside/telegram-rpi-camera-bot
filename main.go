@@ -57,6 +57,8 @@ var isVerbose bool
 var availableIds []string
 var imageWidth, imageHeight int
 var cameraParams map[string]interface{}
+var isInMaintenance bool
+var maintenanceMessage string
 var pool SessionPool
 var captureChannel chan CaptureRequest
 var launched time.Time
@@ -96,6 +98,13 @@ func init() {
 
 		// other camera params
 		cameraParams = config.CameraParams
+
+		// maintenance
+		isInMaintenance = config.IsInMaintenance
+		maintenanceMessage = config.MaintenanceMessage
+		if len(maintenanceMessage) <= 0 {
+			maintenanceMessage = conf.DefaultMaintenanceMessage
+		}
 
 		// initialize session variables
 		sessions := make(map[string]Session)
@@ -215,14 +224,23 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				log.Printf("*** Failed to send message: %s\n", *sent.Description)
 			}
 		} else {
-			// push to capture request channel
-			captureChannel <- CaptureRequest{
-				ChatId:         update.Message.Chat.Id,
-				Directory:      TempDir,
-				ImageWidth:     imageWidth,
-				ImageHeight:    imageHeight,
-				CameraParams:   cameraParams,
-				MessageOptions: options,
+			if isInMaintenance {
+				// send message
+				if sent := b.SendMessage(update.Message.Chat.Id, &maintenanceMessage, options); sent.Ok {
+					result = true
+				} else {
+					log.Printf("*** Failed to send message: %s\n", *sent.Description)
+				}
+			} else {
+				// push to capture request channel
+				captureChannel <- CaptureRequest{
+					ChatId:         update.Message.Chat.Id,
+					Directory:      TempDir,
+					ImageWidth:     imageWidth,
+					ImageHeight:    imageHeight,
+					CameraParams:   cameraParams,
+					MessageOptions: options,
+				}
 			}
 		}
 	} else {

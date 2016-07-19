@@ -23,13 +23,15 @@ const (
 
 // struct for config file
 type Config struct {
-	ApiToken        string                 `json:"api_token"`
-	AvailableIds    []string               `json:"available_ids"`
-	MonitorInterval int                    `json:"monitor_interval"`
-	ImageWidth      int                    `json:"image_width"`
-	ImageHeight     int                    `json:"image_height"`
-	CameraParams    map[string]interface{} `json:"camera_params"`
-	IsVerbose       bool                   `json:"is_verbose"`
+	ApiToken           string                 `json:"api_token"`
+	AvailableIds       []string               `json:"available_ids"`
+	MonitorInterval    int                    `json:"monitor_interval"`
+	ImageWidth         int                    `json:"image_width"`
+	ImageHeight        int                    `json:"image_height"`
+	CameraParams       map[string]interface{} `json:"camera_params"`
+	IsInMaintenance    bool                   `json:"is_in_maintenance"`
+	MaintenanceMessage string                 `json:"maintenance_message"`
+	IsVerbose          bool                   `json:"is_verbose"`
 }
 
 // Read config
