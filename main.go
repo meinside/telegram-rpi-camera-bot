@@ -142,7 +142,7 @@ Following commands are supported:
 
 *For Raspberry Pi Camera Module*
 
-/capture : capture an still image with *raspistill*
+/capture : capture a still image with *raspistill*
 
 *Others*
 
