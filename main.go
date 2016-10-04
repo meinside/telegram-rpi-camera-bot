@@ -137,18 +137,22 @@ func isAvailableId(id string) bool {
 
 // for showing help message
 func getHelp() string {
-	return `
+	return fmt.Sprintf(`
 Following commands are supported:
 
 *For Raspberry Pi Camera Module*
 
-/capture : capture a still image with *raspistill*
+%s : capture a still image with *raspistill*
 
 *Others*
 
-/status : show this bot's status
-/help : show this help message
-`
+%s : show this bot's status
+%s : show this help message
+`,
+		conf.CommandCapture,
+		conf.CommandStatus,
+		conf.CommandHelp,
+	)
 }
 
 // for showing current status of this bot
