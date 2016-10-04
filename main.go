@@ -264,6 +264,9 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 
 	// send photo
 	if filepath, err := helper.CaptureRaspiStill(request.Directory, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
+		// captured time
+		request.MessageOptions["caption"] = time.Now().Format("2006-01-02(Mon) 15:04:05")
+
 		// 'uploading photo...'
 		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
 
