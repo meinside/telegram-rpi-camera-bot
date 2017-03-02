@@ -30,6 +30,7 @@ const (
 type Session struct {
 	UserId        string
 	CurrentStatus Status
+	LastUpdateId  int
 }
 
 // session pool for storing individual statuses
@@ -112,6 +113,7 @@ func init() {
 			sessions[v] = Session{
 				UserId:        v,
 				CurrentStatus: StatusWaiting,
+				LastUpdateId:  -1,
 			}
 		}
 		pool = SessionPool{
@@ -179,73 +181,86 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 
 	pool.Lock()
 	if session, exists := pool.Sessions[userId]; exists {
-		// text from message
-		var txt string
-		if update.Message.HasText() {
-			txt = *update.Message.Text
-		} else {
-			txt = ""
-		}
-
-		var message string
-		var options map[string]interface{} = map[string]interface{}{
-			"reply_markup": bot.ReplyKeyboardMarkup{
-				Keyboard:       allKeyboards,
-				ResizeKeyboard: true,
-			},
-			"parse_mode": bot.ParseModeMarkdown,
-		}
-
-		switch session.CurrentStatus {
-		case StatusWaiting:
-			switch {
-			// start
-			case strings.HasPrefix(txt, conf.CommandStart):
-				message = conf.MessageDefault
-			// capture
-			case strings.HasPrefix(txt, conf.CommandCapture):
-				message = ""
-			// status
-			case strings.HasPrefix(txt, conf.CommandStatus):
-				message = getStatus()
-			// help
-			case strings.HasPrefix(txt, conf.CommandHelp):
-				message = getHelp()
-			// fallback
-			default:
-				message = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+		// XXX - for skipping duplicated update
+		// (sometimes same update is retrieved again and again due to API error)
+		if session.LastUpdateId != update.UpdateId {
+			// save last update id
+			pool.Sessions[userId] = Session{
+				UserId:        session.UserId,
+				CurrentStatus: session.CurrentStatus,
+				LastUpdateId:  update.UpdateId,
 			}
-		}
 
-		if len(message) > 0 {
-			// 'typing...'
-			b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
-
-			// send message
-			if sent := b.SendMessage(update.Message.Chat.Id, &message, options); sent.Ok {
-				result = true
+			// text from message
+			var txt string
+			if update.Message.HasText() {
+				txt = *update.Message.Text
 			} else {
-				log.Printf("*** Failed to send message: %s\n", *sent.Description)
+				txt = ""
 			}
-		} else {
-			if isInMaintenance {
+
+			var message string
+			var options map[string]interface{} = map[string]interface{}{
+				"reply_markup": bot.ReplyKeyboardMarkup{
+					Keyboard:       allKeyboards,
+					ResizeKeyboard: true,
+				},
+				"parse_mode": bot.ParseModeMarkdown,
+			}
+
+			switch session.CurrentStatus {
+			case StatusWaiting:
+				switch {
+				// start
+				case strings.HasPrefix(txt, conf.CommandStart):
+					message = conf.MessageDefault
+				// capture
+				case strings.HasPrefix(txt, conf.CommandCapture):
+					message = ""
+				// status
+				case strings.HasPrefix(txt, conf.CommandStatus):
+					message = getStatus()
+				// help
+				case strings.HasPrefix(txt, conf.CommandHelp):
+					message = getHelp()
+				// fallback
+				default:
+					message = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+				}
+			}
+
+			if len(message) > 0 {
+				// 'typing...'
+				b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
+
 				// send message
-				if sent := b.SendMessage(update.Message.Chat.Id, &maintenanceMessage, options); sent.Ok {
+				if sent := b.SendMessage(update.Message.Chat.Id, &message, options); sent.Ok {
 					result = true
 				} else {
 					log.Printf("*** Failed to send message: %s\n", *sent.Description)
 				}
 			} else {
-				// push to capture request channel
-				captureChannel <- CaptureRequest{
-					ChatId:         update.Message.Chat.Id,
-					Directory:      TempDir,
-					ImageWidth:     imageWidth,
-					ImageHeight:    imageHeight,
-					CameraParams:   cameraParams,
-					MessageOptions: options,
+				if isInMaintenance {
+					// send message
+					if sent := b.SendMessage(update.Message.Chat.Id, &maintenanceMessage, options); sent.Ok {
+						result = true
+					} else {
+						log.Printf("*** Failed to send message: %s\n", *sent.Description)
+					}
+				} else {
+					// push to capture request channel
+					captureChannel <- CaptureRequest{
+						ChatId:         update.Message.Chat.Id,
+						Directory:      TempDir,
+						ImageWidth:     imageWidth,
+						ImageHeight:    imageHeight,
+						CameraParams:   cameraParams,
+						MessageOptions: options,
+					}
 				}
 			}
+		} else {
+			log.Printf("*** Duplicated update id: %d\n", update.UpdateId)
 		}
 	} else {
 		log.Printf("*** Session does not exist for id: %s\n", userId)
