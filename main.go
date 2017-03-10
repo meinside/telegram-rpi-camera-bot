@@ -146,6 +146,8 @@ Following commands are supported:
 
 %s : show this bot's status
 %s : show this help message
+
+https://github.com/meinside/telegram-bot-rpi-camera
 `,
 		conf.CommandCapture,
 		conf.CommandStatus,
