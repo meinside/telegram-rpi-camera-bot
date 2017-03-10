@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -22,8 +21,6 @@ const (
 )
 
 const (
-	TempDir = "/var/tmp" // 'tmpfs /var/tmp tmpfs nodev,nosuid,size=10M 0 0' in /etc/fstab
-
 	NumQueue = 4
 )
 
@@ -44,7 +41,6 @@ var cameraLock sync.Mutex
 
 type CaptureRequest struct {
 	ChatId         interface{}
-	Directory      string
 	ImageWidth     int
 	ImageHeight    int
 	CameraParams   map[string]interface{}
@@ -251,7 +247,6 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					// push to capture request channel
 					captureChannel <- CaptureRequest{
 						ChatId:         update.Message.Chat.Id,
-						Directory:      TempDir,
 						ImageWidth:     imageWidth,
 						ImageHeight:    imageHeight,
 						CameraParams:   cameraParams,
@@ -282,7 +277,7 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 	b.SendChatAction(request.ChatId, bot.ChatActionTyping)
 
 	// send photo
-	if filepath, err := helper.CaptureRaspiStill(request.Directory, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
+	if bytes, err := helper.CaptureRaspiStill(request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
 		// captured time
 		request.MessageOptions["caption"] = time.Now().Format("2006-01-02 (Mon) 15:04:05")
 
@@ -290,16 +285,17 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatId, &filepath, request.MessageOptions); sent.Ok {
-			if err := os.Remove(filepath); err != nil {
-				log.Printf("*** Failed to delete temp file: %s\n", err)
-			}
+		if sent := b.SendPhotoWithBytes(request.ChatId, bytes, request.MessageOptions); sent.Ok {
 			result = true
 		} else {
 			log.Printf("*** Failed to send photo: %s\n", *sent.Description)
 		}
 	} else {
 		log.Printf("*** Image capture failed: %s\n", err)
+
+		message := fmt.Sprintf("Image capture failed: %s", err)
+
+		b.SendMessage(request.ChatId, &message, request.MessageOptions)
 	}
 
 	return result

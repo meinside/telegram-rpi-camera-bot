@@ -71,16 +71,13 @@ func GetMemoryUsage() (usage string) {
 }
 
 // capture an image with given width, height, and other parameters
-// return the captured image's filepath (for deleting it after use)
-func CaptureRaspiStill(directory string, width, height int, cameraParams map[string]interface{}) (filepath string, err error) {
-	// filepath
-	filepath = fmt.Sprintf("%s/captured_%d.jpg", directory, time.Now().UnixNano()/int64(time.Millisecond))
-
+// return the captured image's bytes
+func CaptureRaspiStill(width, height int, cameraParams map[string]interface{}) (bytes []byte, err error) {
 	// command line arguments
 	args := []string{
 		"-w", strconv.Itoa(width),
 		"-h", strconv.Itoa(height),
-		"-o", filepath,
+		"-o", "-", // output to stdout
 	}
 	for k, v := range cameraParams {
 		args = append(args, k)
@@ -92,8 +89,8 @@ func CaptureRaspiStill(directory string, width, height int, cameraParams map[str
 	// execute command
 	if bytes, err := exec.Command(RaspiStillBin, args...).CombinedOutput(); err != nil {
 		log.Printf("*** Error running %s: %s\n", RaspiStillBin, string(bytes))
-		return "", err
+		return []byte{}, err
 	} else {
-		return filepath, nil
+		return bytes, nil
 	}
 }
