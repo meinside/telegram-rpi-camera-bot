@@ -11,7 +11,6 @@ Install Go and generate your Telegram bot's API token.
 ```bash
 $ git clone https://github.com/meinside/telegram-bot-rpi-camera.git
 $ cd telegram-bot-rpi-camera
-$ go build
 $ cp config.json.sample config.json
 $ vi config.json
 ```
