@@ -31,6 +31,7 @@ type Config struct {
 	CameraParams       map[string]interface{} `json:"camera_params"`
 	IsInMaintenance    bool                   `json:"is_in_maintenance"`
 	MaintenanceMessage string                 `json:"maintenance_message"`
+	LogglyToken        string                 `json:"loggly_token,omitempty"`
 	IsVerbose          bool                   `json:"is_verbose"`
 }
 

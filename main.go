@@ -12,6 +12,8 @@ import (
 
 	"github.com/meinside/telegram-bot-rpi-camera/conf"
 	"github.com/meinside/telegram-bot-rpi-camera/helper"
+
+	"github.com/meinside/loggly-go"
 )
 
 type Status int16
@@ -59,6 +61,18 @@ var maintenanceMessage string
 var pool SessionPool
 var captureChannel chan CaptureRequest
 var launched time.Time
+var logger *loggly.Loggly
+
+const (
+	AppName = "RPiCameraBot"
+)
+
+type LogglyLog struct {
+	Application string      `json:"app"`
+	Severity    string      `json:"severity"`
+	Message     string      `json:"message,omitempty"`
+	Object      interface{} `json:"obj,omitempty"`
+}
 
 // keyboards
 var allKeyboards = [][]bot.KeyboardButton{
@@ -118,6 +132,13 @@ func init() {
 
 		// channels
 		captureChannel = make(chan CaptureRequest, NumQueue)
+
+		// loggly
+		if config.LogglyToken != "" {
+			logger = loggly.New(config.LogglyToken)
+		} else {
+			logger = nil
+		}
 	} else {
 		panic(err.Error())
 	}
@@ -165,12 +186,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	// check username
 	var userId string
 	if update.Message.From.Username == nil {
-		log.Printf("*** Not allowed (no user name): %s\n", *update.Message.From.FirstName)
+		logError(fmt.Sprintf("User not allowed (has no username): %s", *update.Message.From.FirstName))
 		return false
 	}
 	userId = *update.Message.From.Username
 	if !isAvailableId(userId) {
-		log.Printf("*** Id not allowed: %s\n", userId)
+		logError(fmt.Sprintf("Id not allowed: %s", userId))
 		return false
 	}
 
@@ -197,7 +218,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				txt = ""
 			}
 
-			var message string
+			var message, cmd string
 			var options map[string]interface{} = map[string]interface{}{
 				"reply_markup": bot.ReplyKeyboardMarkup{
 					Keyboard:       allKeyboards,
@@ -212,20 +233,28 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				// start
 				case strings.HasPrefix(txt, conf.CommandStart):
 					message = conf.MessageDefault
+					cmd = conf.CommandStart
 				// capture
 				case strings.HasPrefix(txt, conf.CommandCapture):
 					message = ""
+					cmd = conf.CommandCapture
 				// status
 				case strings.HasPrefix(txt, conf.CommandStatus):
 					message = getStatus()
+					cmd = conf.CommandStatus
 				// help
 				case strings.HasPrefix(txt, conf.CommandHelp):
 					message = getHelp()
+					cmd = conf.CommandHelp
 				// fallback
 				default:
 					message = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+					cmd = "unknown"
 				}
 			}
+
+			// log request
+			logRequest(userId, cmd)
 
 			if len(message) > 0 {
 				// 'typing...'
@@ -235,7 +264,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				if sent := b.SendMessage(update.Message.Chat.Id, &message, options); sent.Ok {
 					result = true
 				} else {
-					log.Printf("*** Failed to send message: %s\n", *sent.Description)
+					logError(fmt.Sprintf("Failed to send message: %s", *sent.Description))
 				}
 			} else {
 				if isInMaintenance {
@@ -243,7 +272,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					if sent := b.SendMessage(update.Message.Chat.Id, &maintenanceMessage, options); sent.Ok {
 						result = true
 					} else {
-						log.Printf("*** Failed to send message: %s\n", *sent.Description)
+						logError(fmt.Sprintf("Failed to send maintenance message: %s", *sent.Description))
 					}
 				} else {
 					// push to capture request channel
@@ -257,10 +286,10 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				}
 			}
 		} else {
-			log.Printf("*** Duplicated update id: %d\n", update.UpdateId)
+			logError(fmt.Sprintf("Duplicated update id: %d", update.UpdateId))
 		}
 	} else {
-		log.Printf("*** Session does not exist for id: %s\n", userId)
+		logError(fmt.Sprintf("Session does not exist for id: %s", userId))
 	}
 	pool.Unlock()
 
@@ -290,12 +319,12 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 		if sent := b.SendPhotoWithBytes(request.ChatId, bytes, request.MessageOptions); sent.Ok {
 			result = true
 		} else {
-			log.Printf("*** Failed to send photo: %s\n", *sent.Description)
+			logError(fmt.Sprintf("Failed to send photo: %s", *sent.Description))
 		}
 	} else {
-		log.Printf("*** Image capture failed: %s\n", err)
-
 		message := fmt.Sprintf("Image capture failed: %s", err)
+
+		logError(message)
 
 		b.SendMessage(request.ChatId, &message, request.MessageOptions)
 	}
@@ -309,7 +338,7 @@ func main() {
 
 	// get info about this bot
 	if me := client.GetMe(); me.Ok {
-		log.Printf("Launching bot: @%s (%s)\n", *me.Result.Username, *me.Result.FirstName)
+		logMessage(fmt.Sprintf("Starting bot: @%s (%s)\n", *me.Result.Username, *me.Result.FirstName))
 
 		// delete webhook (getting updates will not work when wehbook is set up)
 		if unhooked := client.DeleteWebhook(); unhooked.Ok {
@@ -331,7 +360,7 @@ func main() {
 						processUpdate(b, update)
 					}
 				} else {
-					log.Printf("*** Error while receiving update (%s)\n", err.Error())
+					logError(fmt.Sprintf("Error while receiving update (%s)", err.Error()))
 				}
 			})
 		} else {
@@ -339,5 +368,45 @@ func main() {
 		}
 	} else {
 		panic("Failed to get info of the bot")
+	}
+}
+
+func logMessage(message string) {
+	log.Println(message)
+
+	if logger != nil {
+		logger.Log(LogglyLog{
+			Application: AppName,
+			Severity:    "Log",
+			Message:     message,
+		})
+	}
+}
+
+func logError(message string) {
+	log.Println(message)
+
+	if logger != nil {
+		logger.Log(LogglyLog{
+			Application: AppName,
+			Severity:    "Error",
+			Message:     message,
+		})
+	}
+}
+
+func logRequest(username, cmd string) {
+	if logger != nil {
+		logger.Log(LogglyLog{
+			Application: AppName,
+			Severity:    "Verbose",
+			Object: struct {
+				Username string `json:"username"`
+				Command  string `json:"command"`
+			}{
+				Username: username,
+				Command:  cmd,
+			},
+		})
 	}
 }
