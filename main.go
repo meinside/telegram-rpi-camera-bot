@@ -186,7 +186,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	// check username
 	var userId string
 	if update.Message.From.Username == nil {
-		logError(fmt.Sprintf("User not allowed (has no username): %s", *update.Message.From.FirstName))
+		logError(fmt.Sprintf("User not allowed (has no username): %s", update.Message.From.FirstName))
 		return false
 	}
 	userId = *update.Message.From.Username
@@ -261,7 +261,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
 
 				// send message
-				if sent := b.SendMessage(update.Message.Chat.Id, &message, options); sent.Ok {
+				if sent := b.SendMessage(update.Message.Chat.Id, message, options); sent.Ok {
 					result = true
 				} else {
 					logError(fmt.Sprintf("Failed to send message: %s", *sent.Description))
@@ -269,7 +269,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			} else {
 				if isInMaintenance {
 					// send message
-					if sent := b.SendMessage(update.Message.Chat.Id, &maintenanceMessage, options); sent.Ok {
+					if sent := b.SendMessage(update.Message.Chat.Id, maintenanceMessage, options); sent.Ok {
 						result = true
 					} else {
 						logError(fmt.Sprintf("Failed to send maintenance message: %s", *sent.Description))
@@ -326,7 +326,7 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 
 		logError(message)
 
-		b.SendMessage(request.ChatId, &message, request.MessageOptions)
+		b.SendMessage(request.ChatId, message, request.MessageOptions)
 	}
 
 	return result
@@ -338,7 +338,7 @@ func main() {
 
 	// get info about this bot
 	if me := client.GetMe(); me.Ok {
-		logMessage(fmt.Sprintf("Starting bot: @%s (%s)\n", *me.Result.Username, *me.Result.FirstName))
+		logMessage(fmt.Sprintf("Starting bot: @%s (%s)\n", *me.Result.Username, me.Result.FirstName))
 
 		// delete webhook (getting updates will not work when wehbook is set up)
 		if unhooked := client.DeleteWebhook(); unhooked.Ok {
