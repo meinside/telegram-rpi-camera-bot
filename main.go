@@ -316,7 +316,7 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatId, bytes, request.MessageOptions); sent.Ok {
+		if sent := b.SendPhoto(request.ChatId, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
 			result = true
 		} else {
 			logError(fmt.Sprintf("Failed to send photo: %s", *sent.Description))
