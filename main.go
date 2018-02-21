@@ -23,7 +23,8 @@ const (
 )
 
 const (
-	NumQueue = 4
+	NumQueue        = 4
+	NumLatestPhotos = 20
 )
 
 type Session struct {
@@ -42,6 +43,7 @@ type SessionPool struct {
 var cameraLock sync.Mutex
 
 type CaptureRequest struct {
+	UserName       string
 	ChatId         interface{}
 	ImageWidth     int
 	ImageHeight    int
@@ -62,6 +64,7 @@ var pool SessionPool
 var captureChannel chan CaptureRequest
 var launched time.Time
 var logger *loggly.Loggly
+var db *helper.Database
 
 const (
 	AppName = "RPiCameraBot"
@@ -139,6 +142,9 @@ func init() {
 		} else {
 			logger = nil
 		}
+
+		// local database
+		db = helper.OpenDb()
 	} else {
 		panic(err.Error())
 	}
@@ -186,12 +192,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	// check username
 	var userId string
 	if update.Message.From.Username == nil {
-		logError(fmt.Sprintf("User not allowed (has no username): %s", update.Message.From.FirstName))
+		logError(fmt.Sprintf("Message - User not allowed (has no username): %s", update.Message.From.FirstName))
 		return false
 	}
 	userId = *update.Message.From.Username
 	if !isAvailableId(userId) {
-		logError(fmt.Sprintf("Id not allowed: %s", userId))
+		logError(fmt.Sprintf("Message - Id not allowed: %s", userId))
 		return false
 	}
 
@@ -201,7 +207,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	pool.Lock()
 	if session, exists := pool.Sessions[userId]; exists {
 		// XXX - for skipping duplicated update
-		// (sometimes same update is retrieved again and again due to API error)
+		// (sometimes same update is retrieved again and again due to Telegram's API error)
 		if session.LastUpdateId != update.UpdateId {
 			// save last update id
 			pool.Sessions[userId] = Session{
@@ -277,6 +283,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				} else {
 					// push to capture request channel
 					captureChannel <- CaptureRequest{
+						UserName:       *update.Message.From.Username,
 						ChatId:         update.Message.Chat.Id,
 						ImageWidth:     imageWidth,
 						ImageHeight:    imageHeight,
@@ -310,13 +317,18 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 	// send photo
 	if bytes, err := helper.CaptureRaspiStill(request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
 		// captured time
-		request.MessageOptions["caption"] = time.Now().Format("2006-01-02 (Mon) 15:04:05")
+		caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
+		request.MessageOptions["caption"] = caption
 
 		// 'uploading photo...'
 		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
 
 		// send photo
 		if sent := b.SendPhoto(request.ChatId, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
+			photo := sent.Result.LargestPhoto()
+
+			db.SavePhoto(request.UserName, photo.FileId, caption)
+
 			result = true
 		} else {
 			logError(fmt.Sprintf("Failed to send photo: %s", *sent.Description))
@@ -330,6 +342,54 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 	}
 
 	return result
+}
+
+// process inline query
+func processInlineQuery(b *bot.Bot, update bot.Update) bool {
+	// check username
+	var userId string
+	if update.InlineQuery.From.Username == nil {
+		logError(fmt.Sprintf("Inline Query - user not allowed (has no username): %s", update.Message.From.FirstName))
+		return false
+	}
+	userId = *update.InlineQuery.From.Username
+	if !isAvailableId(userId) {
+		logError(fmt.Sprintf("Inline Query - id not allowed: %s", userId))
+		return false
+	}
+
+	// retrieve cached photos,
+	photos := db.GetPhotos(userId, NumLatestPhotos)
+
+	if len(photos) > 0 {
+		photoResults := []interface{}{}
+
+		// build up inline query results with cached photos,
+		for _, photo := range photos {
+			caption := photo.Caption
+
+			if newPhoto, id := bot.NewInlineQueryResultCachedPhoto(photo.FileId); id != nil {
+				newPhoto.Caption = &caption
+
+				photoResults = append(photoResults, newPhoto)
+			}
+		}
+
+		// then answer inline query
+		if sent := b.AnswerInlineQuery(
+			update.InlineQuery.Id,
+			photoResults,
+			nil,
+		); sent.Ok {
+			return true
+		} else {
+			logError(fmt.Sprintf("Failed to answer inline query: %s", *sent.Description))
+		}
+	} else {
+		logError("No cached photos for inline query.")
+	}
+
+	return false
 }
 
 func main() {
@@ -356,8 +416,10 @@ func main() {
 			// wait for new updates
 			client.StartMonitoringUpdates(0, monitorInterval, func(b *bot.Bot, update bot.Update, err error) {
 				if err == nil {
-					if update.Message != nil {
+					if update.HasMessage() {
 						processUpdate(b, update)
+					} else if update.HasInlineQuery() {
+						processInlineQuery(b, update)
 					}
 				} else {
 					logError(fmt.Sprintf("Error while receiving update (%s)", err.Error()))
