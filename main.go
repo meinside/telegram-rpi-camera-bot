@@ -254,7 +254,11 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					cmd = conf.CommandHelp
 				// fallback
 				default:
-					message = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+					if len(txt) > 0 {
+						message = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+					} else {
+						message = conf.MessageUnknownCommand
+					}
 					cmd = "unknown"
 				}
 			}
