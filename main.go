@@ -28,9 +28,9 @@ const (
 )
 
 type Session struct {
-	UserId        string
+	UserID        string
 	CurrentStatus Status
-	LastUpdateId  int
+	LastUpdateID  int
 }
 
 // session pool for storing individual statuses
@@ -44,7 +44,7 @@ var cameraLock sync.Mutex
 
 type CaptureRequest struct {
 	UserName       string
-	ChatId         interface{}
+	ChatID         interface{}
 	ImageWidth     int
 	ImageHeight    int
 	CameraParams   map[string]interface{}
@@ -124,9 +124,9 @@ func init() {
 		sessions := make(map[string]Session)
 		for _, v := range availableIds {
 			sessions[v] = Session{
-				UserId:        v,
+				UserID:        v,
 				CurrentStatus: StatusWaiting,
-				LastUpdateId:  -1,
+				LastUpdateID:  -1,
 			}
 		}
 		pool = SessionPool{
@@ -208,12 +208,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	if session, exists := pool.Sessions[userId]; exists {
 		// XXX - for skipping duplicated update
 		// (sometimes same update is retrieved again and again due to Telegram's API error)
-		if session.LastUpdateId != update.UpdateId {
+		if session.LastUpdateID != update.UpdateID {
 			// save last update id
 			pool.Sessions[userId] = Session{
-				UserId:        session.UserId,
+				UserID:        session.UserID,
 				CurrentStatus: session.CurrentStatus,
-				LastUpdateId:  update.UpdateId,
+				LastUpdateID:  update.UpdateID,
 			}
 
 			// text from message
@@ -268,10 +268,10 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 
 			if len(message) > 0 {
 				// 'typing...'
-				b.SendChatAction(update.Message.Chat.Id, bot.ChatActionTyping)
+				b.SendChatAction(update.Message.Chat.ID, bot.ChatActionTyping)
 
 				// send message
-				if sent := b.SendMessage(update.Message.Chat.Id, message, options); sent.Ok {
+				if sent := b.SendMessage(update.Message.Chat.ID, message, options); sent.Ok {
 					result = true
 				} else {
 					logError(fmt.Sprintf("Failed to send message: %s", *sent.Description))
@@ -279,7 +279,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			} else {
 				if isInMaintenance {
 					// send message
-					if sent := b.SendMessage(update.Message.Chat.Id, maintenanceMessage, options); sent.Ok {
+					if sent := b.SendMessage(update.Message.Chat.ID, maintenanceMessage, options); sent.Ok {
 						result = true
 					} else {
 						logError(fmt.Sprintf("Failed to send maintenance message: %s", *sent.Description))
@@ -288,7 +288,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					// push to capture request channel
 					captureChannel <- CaptureRequest{
 						UserName:       *update.Message.From.Username,
-						ChatId:         update.Message.Chat.Id,
+						ChatID:         update.Message.Chat.ID,
 						ImageWidth:     imageWidth,
 						ImageHeight:    imageHeight,
 						CameraParams:   cameraParams,
@@ -297,7 +297,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				}
 			}
 		} else {
-			logError(fmt.Sprintf("Duplicated update id: %d", update.UpdateId))
+			logError(fmt.Sprintf("Duplicated update id: %d", update.UpdateID))
 		}
 	} else {
 		logError(fmt.Sprintf("Session does not exist for id: %s", userId))
@@ -316,7 +316,7 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 	defer cameraLock.Unlock()
 
 	// 'typing...'
-	b.SendChatAction(request.ChatId, bot.ChatActionTyping)
+	b.SendChatAction(request.ChatID, bot.ChatActionTyping)
 
 	// send photo
 	if bytes, err := helper.CaptureRaspiStill(request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
@@ -325,13 +325,13 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 		request.MessageOptions["caption"] = caption
 
 		// 'uploading photo...'
-		b.SendChatAction(request.ChatId, bot.ChatActionUploadPhoto)
+		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatId, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
+		if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
 			photo := sent.Result.LargestPhoto()
 
-			db.SavePhoto(request.UserName, photo.FileId, caption)
+			db.SavePhoto(request.UserName, photo.FileID, caption)
 
 			result = true
 		} else {
@@ -342,7 +342,7 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 
 		logError(message)
 
-		b.SendMessage(request.ChatId, message, request.MessageOptions)
+		b.SendMessage(request.ChatID, message, request.MessageOptions)
 	}
 
 	return result
@@ -381,7 +381,7 @@ func processInlineQuery(b *bot.Bot, update bot.Update) bool {
 
 		// then answer inline query
 		if sent := b.AnswerInlineQuery(
-			update.InlineQuery.Id,
+			update.InlineQuery.ID,
 			photoResults,
 			nil,
 		); sent.Ok {
