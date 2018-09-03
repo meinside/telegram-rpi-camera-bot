@@ -70,9 +70,10 @@ const (
 	AppName = "RPiCameraBot"
 )
 
-type LogglyLog struct {
+type logglyLog struct {
 	Application string      `json:"app"`
 	Severity    string      `json:"severity"`
+	Timestamp   string      `json:"timestamp"`
 	Message     string      `json:"message,omitempty"`
 	Object      interface{} `json:"obj,omitempty"`
 }
@@ -441,9 +442,12 @@ func logMessage(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		logger.Log(LogglyLog{
+		_, timestamp := logger.Timestamp()
+
+		logger.Log(logglyLog{
 			Application: AppName,
 			Severity:    "Log",
+			Timestamp:   timestamp,
 			Message:     message,
 		})
 	}
@@ -453,9 +457,12 @@ func logError(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		logger.Log(LogglyLog{
+		_, timestamp := logger.Timestamp()
+
+		logger.Log(logglyLog{
 			Application: AppName,
 			Severity:    "Error",
+			Timestamp:   timestamp,
 			Message:     message,
 		})
 	}
@@ -463,9 +470,12 @@ func logError(message string) {
 
 func logRequest(username, cmd string) {
 	if logger != nil {
-		logger.Log(LogglyLog{
+		_, timestamp := logger.Timestamp()
+
+		logger.Log(logglyLog{
 			Application: AppName,
 			Severity:    "Verbose",
+			Timestamp:   timestamp,
 			Object: struct {
 				Username string `json:"username"`
 				Command  string `json:"command"`
