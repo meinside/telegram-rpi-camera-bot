@@ -16,33 +16,34 @@ import (
 	"github.com/meinside/loggly-go"
 )
 
-type Status int16
+type status int16
 
+// constants
 const (
-	StatusWaiting Status = iota
+	statusWaiting status = iota
+
+	numQueue        = 4
+	numLatestPhotos = 20
 )
 
-const (
-	NumQueue        = 4
-	NumLatestPhotos = 20
-)
-
-type Session struct {
+// session struct
+type _session struct {
 	UserID        string
-	CurrentStatus Status
+	CurrentStatus status
 	LastUpdateID  int
 }
 
 // session pool for storing individual statuses
-type SessionPool struct {
-	Sessions map[string]Session
+type _sessionPool struct {
+	Sessions map[string]_session
 	sync.Mutex
 }
 
 // for making sure the camera is not used simultaneously
 var cameraLock sync.Mutex
 
-type CaptureRequest struct {
+// capture request
+type _captureRequest struct {
 	UserName       string
 	ChatID         interface{}
 	ImageWidth     int
@@ -60,14 +61,14 @@ var imageWidth, imageHeight int
 var cameraParams map[string]interface{}
 var isInMaintenance bool
 var maintenanceMessage string
-var pool SessionPool
-var captureChannel chan CaptureRequest
+var pool _sessionPool
+var captureChannel chan _captureRequest
 var launched time.Time
 var logger *loggly.Loggly
 var db *helper.Database
 
 const (
-	AppName = "RPiCameraBot"
+	appName = "RPiCameraBot"
 )
 
 type logglyLog struct {
@@ -122,20 +123,20 @@ func init() {
 		}
 
 		// initialize session variables
-		sessions := make(map[string]Session)
+		sessions := make(map[string]_session)
 		for _, v := range availableIds {
-			sessions[v] = Session{
+			sessions[v] = _session{
 				UserID:        v,
-				CurrentStatus: StatusWaiting,
+				CurrentStatus: statusWaiting,
 				LastUpdateID:  -1,
 			}
 		}
-		pool = SessionPool{
+		pool = _sessionPool{
 			Sessions: sessions,
 		}
 
 		// channels
-		captureChannel = make(chan CaptureRequest, NumQueue)
+		captureChannel = make(chan _captureRequest, numQueue)
 
 		// loggly
 		if config.LogglyToken != "" {
@@ -152,7 +153,7 @@ func init() {
 }
 
 // check if given Telegram id is available
-func isAvailableId(id string) bool {
+func isAvailableID(id string) bool {
 	for _, v := range availableIds {
 		if v == id {
 			return true
@@ -191,14 +192,14 @@ func getStatus() string {
 // process incoming update from Telegram
 func processUpdate(b *bot.Bot, update bot.Update) bool {
 	// check username
-	var userId string
+	var userID string
 	if update.Message.From.Username == nil {
 		logError(fmt.Sprintf("Message - User not allowed (has no username): %s", update.Message.From.FirstName))
 		return false
 	}
-	userId = *update.Message.From.Username
-	if !isAvailableId(userId) {
-		logError(fmt.Sprintf("Message - Id not allowed: %s", userId))
+	userID = *update.Message.From.Username
+	if !isAvailableID(userID) {
+		logError(fmt.Sprintf("Message - Id not allowed: %s", userID))
 		return false
 	}
 
@@ -206,12 +207,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	result := false
 
 	pool.Lock()
-	if session, exists := pool.Sessions[userId]; exists {
+	if session, exists := pool.Sessions[userID]; exists {
 		// XXX - for skipping duplicated update
 		// (sometimes same update is retrieved again and again due to Telegram's API error)
 		if session.LastUpdateID != update.UpdateID {
 			// save last update id
-			pool.Sessions[userId] = Session{
+			pool.Sessions[userID] = _session{
 				UserID:        session.UserID,
 				CurrentStatus: session.CurrentStatus,
 				LastUpdateID:  update.UpdateID,
@@ -226,7 +227,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			}
 
 			var message, cmd string
-			var options map[string]interface{} = map[string]interface{}{
+			var options = map[string]interface{}{
 				"reply_markup": bot.ReplyKeyboardMarkup{
 					Keyboard:       allKeyboards,
 					ResizeKeyboard: true,
@@ -235,7 +236,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			}
 
 			switch session.CurrentStatus {
-			case StatusWaiting:
+			case statusWaiting:
 				switch {
 				// start
 				case strings.HasPrefix(txt, conf.CommandStart):
@@ -265,7 +266,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			}
 
 			// log request
-			logRequest(userId, cmd)
+			logRequest(userID, cmd)
 
 			if len(message) > 0 {
 				// 'typing...'
@@ -287,7 +288,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					}
 				} else {
 					// push to capture request channel
-					captureChannel <- CaptureRequest{
+					captureChannel <- _captureRequest{
 						UserName:       *update.Message.From.Username,
 						ChatID:         update.Message.Chat.ID,
 						ImageWidth:     imageWidth,
@@ -301,7 +302,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 			logError(fmt.Sprintf("Duplicated update id: %d", update.UpdateID))
 		}
 	} else {
-		logError(fmt.Sprintf("Session does not exist for id: %s", userId))
+		logError(fmt.Sprintf("Session does not exist for id: %s", userID))
 	}
 	pool.Unlock()
 
@@ -309,7 +310,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 }
 
 // process capture request
-func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
+func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 	// process result
 	result := false
 
@@ -352,19 +353,19 @@ func processCaptureRequest(b *bot.Bot, request CaptureRequest) bool {
 // process inline query
 func processInlineQuery(b *bot.Bot, update bot.Update) bool {
 	// check username
-	var userId string
+	var userID string
 	if update.InlineQuery.From.Username == nil {
 		logError(fmt.Sprintf("Inline Query - user not allowed (has no username): %s", update.Message.From.FirstName))
 		return false
 	}
-	userId = *update.InlineQuery.From.Username
-	if !isAvailableId(userId) {
-		logError(fmt.Sprintf("Inline Query - id not allowed: %s", userId))
+	userID = *update.InlineQuery.From.Username
+	if !isAvailableID(userID) {
+		logError(fmt.Sprintf("Inline Query - id not allowed: %s", userID))
 		return false
 	}
 
 	// retrieve cached photos,
-	photos := db.GetPhotos(userId, NumLatestPhotos)
+	photos := db.GetPhotos(userID, numLatestPhotos)
 
 	if len(photos) > 0 {
 		photoResults := []interface{}{}
@@ -381,15 +382,17 @@ func processInlineQuery(b *bot.Bot, update bot.Update) bool {
 		}
 
 		// then answer inline query
-		if sent := b.AnswerInlineQuery(
+		sent := b.AnswerInlineQuery(
 			update.InlineQuery.ID,
 			photoResults,
 			nil,
-		); sent.Ok {
+		)
+
+		if sent.Ok {
 			return true
-		} else {
-			logError(fmt.Sprintf("Failed to answer inline query: %s", *sent.Description))
 		}
+
+		logError(fmt.Sprintf("Failed to answer inline query: %s", *sent.Description))
 	} else {
 		logError("No cached photos for inline query.")
 	}
@@ -445,7 +448,7 @@ func logMessage(message string) {
 		_, timestamp := logger.Timestamp()
 
 		logger.Log(logglyLog{
-			Application: AppName,
+			Application: appName,
 			Severity:    "Log",
 			Timestamp:   timestamp,
 			Message:     message,
@@ -460,7 +463,7 @@ func logError(message string) {
 		_, timestamp := logger.Timestamp()
 
 		logger.Log(logglyLog{
-			Application: AppName,
+			Application: appName,
 			Severity:    "Error",
 			Timestamp:   timestamp,
 			Message:     message,
@@ -473,7 +476,7 @@ func logRequest(username, cmd string) {
 		_, timestamp := logger.Timestamp()
 
 		logger.Log(logglyLog{
-			Application: AppName,
+			Application: appName,
 			Severity:    "Verbose",
 			Timestamp:   timestamp,
 			Object: struct {
