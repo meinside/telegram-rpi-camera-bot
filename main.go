@@ -445,7 +445,7 @@ func logMessage(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
@@ -460,7 +460,7 @@ func logError(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
@@ -473,7 +473,7 @@ func logError(message string) {
 
 func logRequest(username, cmd string) {
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
