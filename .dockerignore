@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+config.json.sample
+db.sqlite
+
+systemd/
+
+Dockerfile
+docker-compose.yaml
+
+telegram-bot-rpi-camera

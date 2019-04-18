@@ -2,11 +2,11 @@
 
 With this bot, you can capture images with camera module on your Raspberry Pi.
 
-## 0. Prepare
+## 0. Prepare,
 
 Install Go and generate your Telegram bot's API token.
 
-## 1. Install and configure
+## 1. Install and configure,
 
 ```bash
 $ go get -d github.com/meinside/telegram-bot-rpi-camera
@@ -32,21 +32,29 @@ and edit values to yours:
 }
 ```
 
-## 2. Build and run
+## 2. Build,
+
+### A. build manually,
 
 ```bash
 $ go build
 ```
 
-and run it:
+### B. or build with docker-compose
+
+```bash
+$ docker-compose build
+```
+
+## 3. And Run
+
+### A. run manually,
 
 ```bash
 $ ./telegram-bot-rpi-camera
 ```
 
-## 3. Run as a service
-
-### systemd
+### B. run as a service with systemd,
 
 ```bash
 $ sudo cp systemd/telegram-bot-rpi-camera.service /lib/systemd/system/
@@ -65,6 +73,12 @@ and will start with:
 
 ```bash
 $ sudo systemctl start telegram-bot-rpi-camera.service
+```
+
+### C. or run with docker-compose
+
+```bash
+$ docker-compose up -d
 ```
 
 ## 998. Trouble shooting
