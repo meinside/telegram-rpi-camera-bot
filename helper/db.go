@@ -2,9 +2,8 @@ package helper
 
 import (
 	"log"
-	"path"
+	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 
 const (
 	// constants for local database
-	DbFilename = "../db.sqlite"
+	DbFilename = "db.sqlite"
 )
 
 type Database struct {
@@ -34,30 +33,32 @@ var _db *Database = nil
 
 func OpenDb() *Database {
 	if _db == nil {
-		_, filename, _, _ := runtime.Caller(0) // = __FILE__
-
-		if db, err := sql.Open("sqlite3", filepath.Join(path.Dir(filename), DbFilename)); err != nil {
-			panic("Failed to open database: " + err.Error())
+		if execFilepath, err := os.Executable(); err != nil {
+			panic(err)
 		} else {
-			_db = &Database{
-				db: db,
-			}
+			if db, err := sql.Open("sqlite3", filepath.Join(filepath.Dir(execFilepath), DbFilename)); err != nil {
+				panic("Failed to open database: " + err.Error())
+			} else {
+				_db = &Database{
+					db: db,
+				}
 
-			// photos table
-			if _, err := db.Exec(`create table if not exists photos(
-				id integer primary key autoincrement,
-				user_name text not null,
-				file_id text not null,
-				caption text default null,
-				time datetime default current_timestamp
-			)`); err != nil {
-				panic("Failed to create photos table: " + err.Error())
-			}
-			if _, err := db.Exec(`create index if not exists idx_photos on photos(
-				user_name,
-				time
-			)`); err != nil {
-				panic("Failed to create photos table: " + err.Error())
+				// photos table
+				if _, err := db.Exec(`create table if not exists photos(
+					id integer primary key autoincrement,
+					user_name text not null,
+					file_id text not null,
+					caption text default null,
+					time datetime default current_timestamp
+				)`); err != nil {
+					panic("Failed to create photos table: " + err.Error())
+				}
+				if _, err := db.Exec(`create index if not exists idx_photos on photos(
+					user_name,
+					time
+				)`); err != nil {
+					panic("Failed to create photos table: " + err.Error())
+				}
 			}
 		}
 	}
