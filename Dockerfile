@@ -1,6 +1,6 @@
 # Dockerfile for Golang application
 
-FROM balenalib/raspberrypi3-debian-golang:latest
+FROM balenalib/raspberrypi3-debian-golang:latest AS builder
 
 # Working directory outside $GOPATH
 WORKDIR /src
@@ -19,10 +19,14 @@ RUN go build \
 		.
 
 # Minimal image for running the application
+FROM balenalib/raspberrypi3-debian:latest AS final
 
 # for sqlite3 and rpi binaries
 RUN apt-get update -y && \
 		apt-get install -y apt-utils libsqlite3-dev libraspberrypi-bin
+
+# Copy files from temporary image
+COPY --from=builder /app /
 
 # Copy config file
 COPY ./config.json /

@@ -148,7 +148,7 @@ func init() {
 		// local database
 		db = helper.OpenDb()
 	} else {
-		panic(err.Error())
+		panic(err)
 	}
 }
 
@@ -194,12 +194,12 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	// check username
 	var userID string
 	if update.Message.From.Username == nil {
-		logError(fmt.Sprintf("Message - User not allowed (has no username): %s", update.Message.From.FirstName))
+		logError("message - user not allowed (has no username): %s", update.Message.From.FirstName)
 		return false
 	}
 	userID = *update.Message.From.Username
 	if !isAvailableID(userID) {
-		logError(fmt.Sprintf("Message - Id not allowed: %s", userID))
+		logError("message - id not allowed: %s", userID)
 		return false
 	}
 
@@ -276,7 +276,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				if sent := b.SendMessage(update.Message.Chat.ID, message, options); sent.Ok {
 					result = true
 				} else {
-					logError(fmt.Sprintf("Failed to send message: %s", *sent.Description))
+					logError("failed to send message: %s", *sent.Description)
 				}
 			} else {
 				if isInMaintenance {
@@ -284,7 +284,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 					if sent := b.SendMessage(update.Message.Chat.ID, maintenanceMessage, options); sent.Ok {
 						result = true
 					} else {
-						logError(fmt.Sprintf("Failed to send maintenance message: %s", *sent.Description))
+						logError("failed to send maintenance message: %s", *sent.Description)
 					}
 				} else {
 					// push to capture request channel
@@ -299,10 +299,10 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 				}
 			}
 		} else {
-			logError(fmt.Sprintf("Duplicated update id: %d", update.UpdateID))
+			logError("duplicated update id: %d", update.UpdateID)
 		}
 	} else {
-		logError(fmt.Sprintf("Session does not exist for id: %s", userID))
+		logError("session does not exist for id: %s", userID)
 	}
 	pool.Unlock()
 
@@ -337,10 +337,10 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 
 			result = true
 		} else {
-			logError(fmt.Sprintf("Failed to send photo: %s", *sent.Description))
+			logError("failed to send photo: %s", *sent.Description)
 		}
 	} else {
-		message := fmt.Sprintf("Image capture failed: %s", err)
+		message := fmt.Sprintf("image capture failed: %s", err)
 
 		logError(message)
 
@@ -355,12 +355,12 @@ func processInlineQuery(b *bot.Bot, update bot.Update) bool {
 	// check username
 	var userID string
 	if update.InlineQuery.From.Username == nil {
-		logError(fmt.Sprintf("Inline Query - user not allowed (has no username): %s", update.Message.From.FirstName))
+		logError("inline query - user not allowed (has no username): %s", update.Message.From.FirstName)
 		return false
 	}
 	userID = *update.InlineQuery.From.Username
 	if !isAvailableID(userID) {
-		logError(fmt.Sprintf("Inline Query - id not allowed: %s", userID))
+		logError("inline query - id not allowed: %s", userID)
 		return false
 	}
 
@@ -392,9 +392,9 @@ func processInlineQuery(b *bot.Bot, update bot.Update) bool {
 			return true
 		}
 
-		logError(fmt.Sprintf("Failed to answer inline query: %s", *sent.Description))
+		logError("failed to answer inline query: %s", *sent.Description)
 	} else {
-		logError("No cached photos for inline query.")
+		logError("no cached photos for inline query.")
 	}
 
 	return false
@@ -406,7 +406,7 @@ func main() {
 
 	// get info about this bot
 	if me := client.GetMe(); me.Ok {
-		logMessage(fmt.Sprintf("Starting bot: @%s (%s)\n", *me.Result.Username, me.Result.FirstName))
+		logMessage("starting bot: @%s (%s)", *me.Result.Username, me.Result.FirstName)
 
 		// delete webhook (getting updates will not work when wehbook is set up)
 		if unhooked := client.DeleteWebhook(); unhooked.Ok {
@@ -430,19 +430,19 @@ func main() {
 						processInlineQuery(b, update)
 					}
 				} else {
-					logError(fmt.Sprintf("Error while receiving update (%s)", err.Error()))
+					logError("error while receiving update (%s)", err)
 				}
 			})
 		} else {
-			panic("Failed to delete webhook")
+			panic("failed to delete webhook")
 		}
 	} else {
-		panic("Failed to get info of the bot")
+		panic("failed to get info of the bot")
 	}
 }
 
-func logMessage(message string) {
-	log.Println(message)
+func logMessage(format string, a ...interface{}) {
+	log.Printf(format, a...)
 
 	if logger != nil {
 		_, timestamp := loggly.Timestamp()
@@ -451,13 +451,13 @@ func logMessage(message string) {
 			Application: appName,
 			Severity:    "Log",
 			Timestamp:   timestamp,
-			Message:     message,
+			Message:     fmt.Sprintf(format, a...),
 		})
 	}
 }
 
-func logError(message string) {
-	log.Println(message)
+func logError(format string, a ...interface{}) {
+	log.Printf(format, a...)
 
 	if logger != nil {
 		_, timestamp := loggly.Timestamp()
@@ -466,7 +466,7 @@ func logError(message string) {
 			Application: appName,
 			Severity:    "Error",
 			Timestamp:   timestamp,
-			Message:     message,
+			Message:     fmt.Sprintf(format, a...),
 		})
 	}
 }
