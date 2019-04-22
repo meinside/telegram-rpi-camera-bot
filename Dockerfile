@@ -1,6 +1,9 @@
 # Dockerfile for Golang application
 
-FROM balenalib/raspberrypi3-debian-golang:latest AS builder
+# https://www.balena.io/docs/reference/base-images/base-images-ref/
+ARG RPI=raspberrypi3
+
+FROM balenalib/$RPI-debian-golang:latest AS builder
 
 # Working directory outside $GOPATH
 WORKDIR /src
@@ -19,7 +22,7 @@ RUN go build \
 		.
 
 # Minimal image for running the application
-FROM balenalib/raspberrypi3-debian:latest AS final
+FROM balenalib/$RPI-debian:latest AS final
 
 # for sqlite3 and rpi binaries
 RUN apt-get update -y && \
