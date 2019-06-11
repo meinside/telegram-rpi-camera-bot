@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -87,6 +88,10 @@ var allKeyboards = [][]bot.KeyboardButton{
 var cancelKeyboard = [][]bot.KeyboardButton{
 	bot.NewKeyboardButtons(conf.CommandCancel),
 }
+
+// loggers
+var _stdout = log.New(os.Stdout, "", log.LstdFlags)
+var _stderr = log.New(os.Stderr, "", log.LstdFlags)
 
 // initialization
 func init() {
@@ -442,7 +447,7 @@ func main() {
 }
 
 func logMessage(format string, a ...interface{}) {
-	log.Printf(format, a...)
+	_stdout.Printf(format, a...)
 
 	if logger != nil {
 		_, timestamp := loggly.Timestamp()
@@ -457,7 +462,7 @@ func logMessage(format string, a ...interface{}) {
 }
 
 func logError(format string, a ...interface{}) {
-	log.Printf(format, a...)
+	_stderr.Printf(format, a...)
 
 	if logger != nil {
 		_, timestamp := loggly.Timestamp()
