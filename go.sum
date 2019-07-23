@@ -2,6 +2,6 @@ github.com/mattn/go-sqlite3 v1.10.0 h1:jbhqpg7tQe4SupckyijYiy0mJJ/pRyHvXf7JdWK86
 github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/meinside/loggly-go v0.1.8 h1:S2tZ/xihGvW77y1DJP5RhtzbJW/fg/1xb4T1YNeBu18=
 github.com/meinside/loggly-go v0.1.8/go.mod h1:PZPbV/jxZBRU1hFv/8uo+Hus3p1PZe8ny85vPsCxUSs=
-github.com/meinside/telegram-bot-go v0.0.14 h1:4ko26XhZxyvs6DIkutHRDQviMrU6AqIzbeD2cNgywCg=
-github.com/meinside/telegram-bot-go v0.0.14/go.mod h1:gS/BXucqjU9q4BX5W1OlsQ3BoOlJqGOTPvAG9+4+TsA=
+github.com/meinside/telegram-bot-go v0.0.15 h1:Ve1LPFL6HNXYmIKWtwmMXbumyzgTBPdICJw7fbGUgnk=
+github.com/meinside/telegram-bot-go v0.0.15/go.mod h1:gS/BXucqjU9q4BX5W1OlsQ3BoOlJqGOTPvAG9+4+TsA=
 github.com/meinside/wasm-helper-go v0.0.4/go.mod h1:rrqb+xFboJK0/No8NAGkTTk1Y4qEUYHd4BFpUQ3g3wY=
