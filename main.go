@@ -31,7 +31,7 @@ const (
 type _session struct {
 	UserID        string
 	CurrentStatus status
-	LastUpdateID  int
+	LastUpdateID  int64
 }
 
 // session pool for storing individual statuses
@@ -414,7 +414,7 @@ func main() {
 		logMessage("starting bot: @%s (%s)", *me.Result.Username, me.Result.FirstName)
 
 		// delete webhook (getting updates will not work when wehbook is set up)
-		if unhooked := client.DeleteWebhook(); unhooked.Ok {
+		if unhooked := client.DeleteWebhook(false); unhooked.Ok {
 			// monitor request capture channel
 			go func() {
 				for {
