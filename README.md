@@ -32,6 +32,19 @@ and edit values to yours:
 }
 ```
 
+If you need to use `ffmpeg` instead of `raspistill`, add following properties:
+
+```json
+{
+	// ...
+
+	"use_ffmpeg": true,
+	"ffmpeg_bin_path": "/usr/local/bin/ffmpeg",
+
+	// ...
+}
+```
+
 ## 2. Build,
 
 ### A. build manually,
