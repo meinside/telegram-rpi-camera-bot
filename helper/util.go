@@ -34,8 +34,9 @@ type Config struct {
 	LogglyToken        string                 `json:"loggly_token,omitempty"`
 	IsVerbose          bool                   `json:"is_verbose"`
 
-	UseFfmpeg     bool   `json:"use_ffmpeg,omitempty"`
-	FfmpegBinPath string `json:"ffmpeg_bin_path,omitempty"`
+	UseFfmpeg      bool   `json:"use_ffmpeg,omitempty"`
+	FfmpegBinPath  string `json:"ffmpeg_bin_path,omitempty"`
+	FfmpegRotation int    `json:"ffmpeg_rotation,omitempty"`
 }
 
 // GetConfig reads config
@@ -101,7 +102,7 @@ func CaptureRaspiStill(raspistillBinPath string, width, height int, cameraParams
 // CaptureFfmpeg captures an image with `ffmpeg.`
 //
 // https://gist.github.com/moritzmhmk/48e5ed9c4baa5557422f16983900ca95#ffmpeg
-func CaptureFfmpeg(ffmpegBinPath string, width, height int) (bytes []byte, err error) {
+func CaptureFfmpeg(ffmpegBinPath string, ffmpegRotation, width, height int) (bytes []byte, err error) {
 	// command line arguments
 	args := []string{
 		"-f", "video4linux2",
@@ -113,8 +114,26 @@ func CaptureFfmpeg(ffmpegBinPath string, width, height int) (bytes []byte, err e
 		"-nostats",
 		"-hide_banner",
 		"-loglevel", "error",
-		"-",
 	}
+
+	// rotation
+	var transpose string
+	switch ffmpegRotation {
+	case 90:
+		transpose = "transpose=1"
+	case 180:
+		transpose = "transpose=2,transpose=2"
+	case 270:
+		transpose = "transpose=2"
+	default:
+		transpose = ""
+	}
+	if transpose != "" {
+		args = append(args, "-vf", transpose)
+	}
+
+	// add last param
+	args = append(args, "-")
 
 	// execute command
 	if bytes, err := exec.Command(ffmpegBinPath, args...).CombinedOutput(); err != nil {

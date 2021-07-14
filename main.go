@@ -62,6 +62,7 @@ var imageWidth, imageHeight int
 var cameraParams map[string]interface{}
 var useFfmpegInstead bool
 var ffmpegBinPath string
+var ffmpegRotation int
 var isInMaintenance bool
 var maintenanceMessage string
 var pool _sessionPool
@@ -86,9 +87,6 @@ type logglyLog struct {
 var allKeyboards = [][]bot.KeyboardButton{
 	bot.NewKeyboardButtons(conf.CommandCapture),
 	bot.NewKeyboardButtons(conf.CommandStatus, conf.CommandHelp),
-}
-var cancelKeyboard = [][]bot.KeyboardButton{
-	bot.NewKeyboardButtons(conf.CommandCancel),
 }
 
 // loggers
@@ -125,6 +123,7 @@ func init() {
 		// use ffmpeg instead?
 		useFfmpegInstead = config.UseFfmpeg
 		ffmpegBinPath = config.FfmpegBinPath
+		ffmpegRotation = config.FfmpegRotation
 
 		// maintenance
 		isInMaintenance = config.IsInMaintenance
@@ -336,7 +335,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		if ffmpegBinPath == "" {
 			ffmpegBinPath = helper.FfmpegBinDefault
 		}
-		if bytes, err := helper.CaptureFfmpeg(ffmpegBinPath, request.ImageWidth, request.ImageHeight); err == nil {
+		if bytes, err := helper.CaptureFfmpeg(ffmpegBinPath, ffmpegRotation, request.ImageWidth, request.ImageHeight); err == nil {
 			// captured time
 			caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
 			request.MessageOptions["caption"] = caption
