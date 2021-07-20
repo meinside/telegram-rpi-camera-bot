@@ -106,15 +106,18 @@ func (d *Database) GetPhotos(userName string, latestN int) []Photo {
 			var userName, fileId, caption, datetime string
 			var tm time.Time
 			for rows.Next() {
-				rows.Scan(&userName, &fileId, &caption, &datetime)
-				tm, _ = time.Parse("2006-01-02 15:04:05", datetime)
+				if err := rows.Scan(&userName, &fileId, &caption, &datetime); err == nil {
+					tm, _ = time.Parse("2006-01-02 15:04:05", datetime)
 
-				photos = append(photos, Photo{
-					UserName: userName,
-					FileId:   fileId,
-					Caption:  caption,
-					Time:     tm,
-				})
+					photos = append(photos, Photo{
+						UserName: userName,
+						FileId:   fileId,
+						Caption:  caption,
+						Time:     tm,
+					})
+				} else {
+					log.Printf("*** Failed to scan row: %s", err.Error())
+				}
 			}
 		}
 	}

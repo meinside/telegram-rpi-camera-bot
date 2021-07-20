@@ -464,11 +464,8 @@ func main() {
 			// monitor request capture channel
 			go func() {
 				for {
-					select {
-					case request := <-captureChannel:
-						// do capture and send response
-						processCaptureRequest(client, request)
-					}
+					// do capture and send response
+					processCaptureRequest(client, <-captureChannel)
 				}
 			}()
 
