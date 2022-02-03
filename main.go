@@ -60,9 +60,6 @@ var isVerbose bool
 var availableIds []string
 var imageWidth, imageHeight int
 var cameraParams map[string]interface{}
-var useFfmpegInstead bool
-var ffmpegBinPath string
-var ffmpegRotation int
 var isInMaintenance bool
 var maintenanceMessage string
 var pool _sessionPool
@@ -119,11 +116,6 @@ func init() {
 
 		// other camera params
 		cameraParams = config.CameraParams
-
-		// use ffmpeg instead?
-		useFfmpegInstead = config.UseFfmpeg
-		ffmpegBinPath = config.FfmpegBinPath
-		ffmpegRotation = config.FfmpegRotation
 
 		// maintenance
 		isInMaintenance = config.IsInMaintenance
@@ -331,71 +323,35 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 	b.SendChatAction(request.ChatID, bot.ChatActionTyping)
 
 	// send photo
-	if useFfmpegInstead { // when ffmpeg is used,
-		if ffmpegBinPath == "" {
-			ffmpegBinPath = helper.FfmpegBinDefault
-		}
-		if bytes, err := helper.CaptureFfmpeg(ffmpegBinPath, ffmpegRotation, request.ImageWidth, request.ImageHeight); err == nil {
-			// captured time
-			caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
-			request.MessageOptions["caption"] = caption
+	if bytes, err := helper.CaptureStillImage(helper.LibCameraStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
+		// captured time
+		caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
+		request.MessageOptions["caption"] = caption
 
-			// 'uploading photo...'
-			b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto)
+		// 'uploading photo...'
+		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto)
 
-			// send photo
-			if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
-				photo := sent.Result.LargestPhoto()
+		// send photo
+		if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
+			photo := sent.Result.LargestPhoto()
 
-				db.SavePhoto(request.UserName, photo.FileID, caption)
+			db.SavePhoto(request.UserName, photo.FileID, caption)
 
-				result = true
-			} else {
-				msg := fmt.Sprintf("failed to send photo: %s", *sent.Description)
-
-				logError(msg)
-
-				// send error message
-				b.SendMessage(request.ChatID, msg, nil)
-			}
+			result = true
 		} else {
-			message := fmt.Sprintf("image capture failed: %s", err)
+			msg := fmt.Sprintf("failed to send photo: %s", *sent.Description)
 
-			logError(message)
+			logError(msg)
 
-			b.SendMessage(request.ChatID, message, request.MessageOptions)
+			// send error message
+			b.SendMessage(request.ChatID, msg, nil)
 		}
-	} else { // otherwise, use raspistill (default)
-		if bytes, err := helper.CaptureRaspiStill(helper.RaspiStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
-			// captured time
-			caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
-			request.MessageOptions["caption"] = caption
+	} else {
+		message := fmt.Sprintf("image capture failed: %s", err)
 
-			// 'uploading photo...'
-			b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto)
+		logError(message)
 
-			// send photo
-			if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
-				photo := sent.Result.LargestPhoto()
-
-				db.SavePhoto(request.UserName, photo.FileID, caption)
-
-				result = true
-			} else {
-				msg := fmt.Sprintf("failed to send photo: %s", *sent.Description)
-
-				logError(msg)
-
-				// send error message
-				b.SendMessage(request.ChatID, msg, nil)
-			}
-		} else {
-			message := fmt.Sprintf("image capture failed: %s", err)
-
-			logError(message)
-
-			b.SendMessage(request.ChatID, message, request.MessageOptions)
-		}
+		b.SendMessage(request.ChatID, message, request.MessageOptions)
 	}
 
 	return result
