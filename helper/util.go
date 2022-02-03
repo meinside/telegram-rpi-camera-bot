@@ -17,8 +17,8 @@ const (
 	// constants for config
 	ConfigFilename = "config.json"
 
-	RaspiStillBin    = "/usr/bin/raspistill"
-	FfmpegBinDefault = "/usr/local/bin/ffmpeg"
+	LibCameraStillBin = "/usr/bin/libcamera-still"
+	FfmpegBinDefault  = "/usr/local/bin/ffmpeg"
 )
 
 // struct for config file
@@ -33,10 +33,6 @@ type Config struct {
 	MaintenanceMessage string                 `json:"maintenance_message"`
 	LogglyToken        string                 `json:"loggly_token,omitempty"`
 	IsVerbose          bool                   `json:"is_verbose"`
-
-	UseFfmpeg      bool   `json:"use_ffmpeg,omitempty"`
-	FfmpegBinPath  string `json:"ffmpeg_bin_path,omitempty"`
-	FfmpegRotation int    `json:"ffmpeg_rotation,omitempty"`
 }
 
 // GetConfig reads config
@@ -75,13 +71,14 @@ func GetMemoryUsage() (usage string) {
 	return fmt.Sprintf("Sys: *%.1f MB*, Heap: *%.1f MB*", float32(m.Sys)/1024/1024, float32(m.HeapAlloc)/1024/1024)
 }
 
-// CaptureRaspiStill captures an image with `raspistill`.
-func CaptureRaspiStill(raspistillBinPath string, width, height int, cameraParams map[string]interface{}) (bytes []byte, err error) {
+// CaptureStillImage captures an image with `raspistill`.
+func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (bytes []byte, err error) {
 	// command line arguments
 	args := []string{
-		"-w", strconv.Itoa(width),
-		"-h", strconv.Itoa(height),
-		"-o", "-", // output to stdout
+		"--width", strconv.Itoa(width),
+		"--height", strconv.Itoa(height),
+		"--encoding", "jpg",
+		"--output", "-", // output to stdout
 	}
 	for k, v := range cameraParams {
 		args = append(args, k)
@@ -90,54 +87,9 @@ func CaptureRaspiStill(raspistillBinPath string, width, height int, cameraParams
 		}
 	}
 
-	// execute command
-	if bytes, err := exec.Command(RaspiStillBin, args...).CombinedOutput(); err != nil {
-		log.Printf("*** Error running %s: %s\n", RaspiStillBin, string(bytes))
-		return []byte{}, err
-	} else {
-		return bytes, nil
-	}
-}
-
-// CaptureFfmpeg captures an image with `ffmpeg.`
-//
-// https://gist.github.com/moritzmhmk/48e5ed9c4baa5557422f16983900ca95#ffmpeg
-func CaptureFfmpeg(ffmpegBinPath string, ffmpegRotation, width, height int) (bytes []byte, err error) {
-	// command line arguments
-	args := []string{
-		"-f", "video4linux2",
-		"-input_format", "mjpeg",
-		"-video_size", fmt.Sprintf("%dx%d", width, height),
-		"-i", "/dev/video0",
-		"-vframes", "1",
-		"-f", "mjpeg",
-		"-nostats",
-		"-hide_banner",
-		"-loglevel", "error",
-	}
-
-	// rotation
-	var transpose string
-	switch ffmpegRotation {
-	case 90:
-		transpose = "transpose=1"
-	case 180:
-		transpose = "transpose=2,transpose=2"
-	case 270:
-		transpose = "transpose=2"
-	default:
-		transpose = ""
-	}
-	if transpose != "" {
-		args = append(args, "-vf", transpose)
-	}
-
-	// add last param
-	args = append(args, "-")
-
-	// execute command
-	if bytes, err := exec.Command(ffmpegBinPath, args...).CombinedOutput(); err != nil {
-		log.Printf("*** Error running %s: %s\n", ffmpegBinPath, string(bytes))
+	// execute command and get its standard output
+	if bytes, err := exec.Command(libcameraStillBinPath, args...).Output(); err != nil {
+		log.Printf("*** Error running %s: %s\n", libcameraStillBinPath, string(bytes))
 		return []byte{}, err
 	} else {
 		return bytes, nil
