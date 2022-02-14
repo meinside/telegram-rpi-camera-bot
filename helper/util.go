@@ -1,10 +1,10 @@
 package helper
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,8 +17,8 @@ const (
 	// constants for config
 	ConfigFilename = "config.json"
 
-	LibCameraStillBin = "/usr/bin/libcamera-still"
-	FfmpegBinDefault  = "/usr/local/bin/ffmpeg"
+	LibCameraStillBin               = "/usr/bin/libcamera-still"
+	LibCameraStillRunTimeoutSeconds = 10
 )
 
 // struct for config file
@@ -72,7 +72,7 @@ func GetMemoryUsage() (usage string) {
 }
 
 // CaptureStillImage captures an image with `raspistill`.
-func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (bytes []byte, err error) {
+func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (result []byte, err error) {
 	// command line arguments
 	args := []string{
 		"--width", strconv.Itoa(width),
@@ -87,11 +87,33 @@ func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraPa
 		}
 	}
 
-	// execute command and get its standard output
-	if bytes, err := exec.Command(libcameraStillBinPath, args...).Output(); err != nil {
-		log.Printf("*** Error running %s: %s\n", libcameraStillBinPath, string(bytes))
-		return []byte{}, err
-	} else {
-		return bytes, nil
+	// execute command with timeout,
+	cmd := exec.Command(libcameraStillBinPath, args...)
+	var buffer bytes.Buffer
+	cmd.Stdout = &buffer
+	err = cmd.Start()
+	if err == nil {
+		done := make(chan error)
+		go func() { done <- cmd.Wait() }()
+		timeout := time.After(LibCameraStillRunTimeoutSeconds * time.Second)
+
+		// and get its standard output
+		select {
+		case <-timeout:
+			err = cmd.Process.Kill()
+			if err == nil {
+				err = fmt.Errorf("Command timed out: %s", libcameraStillBinPath)
+			} else {
+				err = fmt.Errorf("Command timed out, but failed to kill process: %s", libcameraStillBinPath)
+			}
+		case err = <-done:
+			if err == nil {
+				return buffer.Bytes(), nil
+			} else {
+				err = fmt.Errorf("Error running %s: %s", libcameraStillBinPath, err)
+			}
+		}
 	}
+
+	return nil, err
 }
