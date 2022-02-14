@@ -77,11 +77,11 @@ func (d *Database) SavePhoto(userName, fileId, caption string) {
 	d.Lock()
 
 	if stmt, err := d.db.Prepare(`insert into photos(user_name, file_id, caption) values(?, ?, ?)`); err != nil {
-		log.Printf("*** Failed to prepare a statement: %s\n", err.Error())
+		log.Printf("* Failed to prepare a statement: %s\n", err.Error())
 	} else {
 		defer stmt.Close()
 		if _, err = stmt.Exec(userName, fileId, caption); err != nil {
-			log.Printf("*** Failed to save photo into local database: %s\n", err.Error())
+			log.Printf("* Failed to save photo into local database: %s\n", err.Error())
 		}
 	}
 
@@ -94,12 +94,12 @@ func (d *Database) GetPhotos(userName string, latestN int) []Photo {
 	d.RLock()
 
 	if stmt, err := d.db.Prepare(`select user_name, file_id, caption, datetime(time, 'localtime') as time from photos where user_name = ? order by id desc limit ?`); err != nil {
-		log.Printf("*** Failed to prepare a statement: %s\n", err.Error())
+		log.Printf("* Failed to prepare a statement: %s\n", err.Error())
 	} else {
 		defer stmt.Close()
 
 		if rows, err := stmt.Query(userName, latestN); err != nil {
-			log.Printf("*** Failed to select photos from local database: %s\n", err.Error())
+			log.Printf("* Failed to select photos from local database: %s\n", err.Error())
 		} else {
 			defer rows.Close()
 
@@ -116,7 +116,7 @@ func (d *Database) GetPhotos(userName string, latestN int) []Photo {
 						Time:     tm,
 					})
 				} else {
-					log.Printf("*** Failed to scan row: %s", err.Error())
+					log.Printf("* Failed to scan row: %s", err.Error())
 				}
 			}
 		}

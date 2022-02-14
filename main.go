@@ -339,7 +339,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 
 			result = true
 		} else {
-			msg := fmt.Sprintf("failed to send photo: %s", *sent.Description)
+			msg := fmt.Sprintf("Failed to send photo: %s", *sent.Description)
 
 			logError(msg)
 
@@ -347,7 +347,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 			b.SendMessage(request.ChatID, msg, nil)
 		}
 	} else {
-		message := fmt.Sprintf("image capture failed: %s", err)
+		message := fmt.Sprintf("Image capture failed: %s", err)
 
 		logError(message)
 
