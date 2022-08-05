@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,7 +39,7 @@ func GetConfig() (config Config, err error) {
 	var execFilepath string
 	if execFilepath, err = os.Executable(); err == nil {
 		var file []byte
-		if file, err = ioutil.ReadFile(filepath.Join(filepath.Dir(execFilepath), ConfigFilename)); err == nil {
+		if file, err = os.ReadFile(filepath.Join(filepath.Dir(execFilepath), ConfigFilename)); err == nil {
 			var conf Config
 			if err = json.Unmarshal(file, &conf); err == nil {
 				return conf, nil
