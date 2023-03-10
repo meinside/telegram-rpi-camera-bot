@@ -272,7 +272,7 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 
 			if len(message) > 0 {
 				// 'typing...'
-				b.SendChatAction(update.Message.Chat.ID, bot.ChatActionTyping)
+				b.SendChatAction(update.Message.Chat.ID, bot.ChatActionTyping, nil)
 
 				// send message
 				if sent := b.SendMessage(update.Message.Chat.ID, message, options); sent.Ok {
@@ -320,7 +320,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 	defer cameraLock.Unlock()
 
 	// 'typing...'
-	b.SendChatAction(request.ChatID, bot.ChatActionTyping)
+	b.SendChatAction(request.ChatID, bot.ChatActionTyping, nil)
 
 	// send photo
 	if bytes, err := helper.CaptureStillImage(helper.LibCameraStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
@@ -329,7 +329,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		request.MessageOptions["caption"] = caption
 
 		// 'uploading photo...'
-		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto)
+		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto, nil)
 
 		// send photo
 		if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
