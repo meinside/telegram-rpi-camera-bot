@@ -1,4 +1,4 @@
-module github.com/meinside/telegram-bot-rpi-camera
+module github.com/meinside/telegram-rpi-camera-bot
 
 go 1.20
 
