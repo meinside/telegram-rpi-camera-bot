@@ -11,8 +11,8 @@ import (
 
 	bot "github.com/meinside/telegram-bot-go"
 
-	"github.com/meinside/telegram-bot-rpi-camera/conf"
-	"github.com/meinside/telegram-bot-rpi-camera/helper"
+	"github.com/meinside/telegram-rpi-camera-bot/conf"
+	"github.com/meinside/telegram-rpi-camera-bot/helper"
 
 	"github.com/meinside/loggly-go"
 )
@@ -178,7 +178,7 @@ Following commands are supported:
 %s : show this bot's status
 %s : show this help message
 
-https://github.com/meinside/telegram-bot-rpi-camera
+https://github.com/meinside/telegram-rpi-camera-bot
 `,
 		conf.CommandCapture,
 		conf.CommandStatus,

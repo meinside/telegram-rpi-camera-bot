@@ -9,8 +9,8 @@ Install Go and generate your Telegram bot's API token.
 ## 1. Install and configure,
 
 ```bash
-$ go get -d github.com/meinside/telegram-bot-rpi-camera
-$ cd $GOPATH/src/github.com/meinside/telegram-bot-rpi-camera
+$ go get -d github.com/meinside/telegram-rpi-camera-bot
+$ cd $GOPATH/src/github.com/meinside/telegram-rpi-camera-bot
 $ cp config.json.sample config.json
 $ vi config.json
 ```
@@ -65,14 +65,14 @@ $ docker-compose build --build-arg RPI=raspberry-pi
 ### A. run manually,
 
 ```bash
-$ ./telegram-bot-rpi-camera
+$ ./telegram-rpi-camera-bot
 ```
 
 ### B. run as a service with systemd,
 
 ```bash
-$ sudo cp systemd/telegram-bot-rpi-camera.service /lib/systemd/system/
-$ sudo vi /lib/systemd/system/telegram-bot-rpi-camera.service
+$ sudo cp systemd/telegram-rpi-camera-bot.service /lib/systemd/system/
+$ sudo vi /lib/systemd/system/telegram-rpi-camera-bot.service
 ```
 
 and edit **User**, **Group**, **WorkingDirectory** and **ExecStart** values.
@@ -80,13 +80,13 @@ and edit **User**, **Group**, **WorkingDirectory** and **ExecStart** values.
 It will launch automatically on boot with:
 
 ```bash
-$ sudo systemctl enable telegram-bot-rpi-camera.service
+$ sudo systemctl enable telegram-rpi-camera-bot.service
 ```
 
 and will start with:
 
 ```bash
-$ sudo systemctl start telegram-bot-rpi-camera.service
+$ sudo systemctl start telegram-rpi-camera-bot.service
 ```
 
 ### C. or run with docker-compose

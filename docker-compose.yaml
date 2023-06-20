@@ -2,7 +2,7 @@ version: "3.7"
 services:
   app:
     build: .
-    image: telegram-bot-rpi-camera:latest
+    image: telegram-rpi-camera-bot:latest
     devices:
       - "/dev/vchiq:/dev/vchiq"
     restart: always

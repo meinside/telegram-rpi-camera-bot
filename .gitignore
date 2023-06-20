@@ -1,6 +1,6 @@
 *.swp
 
-telegram-bot-rpi-camera
+telegram-rpi-camera-bot
 
 config.json
 db.sqlite
