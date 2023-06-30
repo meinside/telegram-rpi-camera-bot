@@ -13,8 +13,6 @@ import (
 
 	"github.com/meinside/telegram-rpi-camera-bot/conf"
 	"github.com/meinside/telegram-rpi-camera-bot/helper"
-
-	"github.com/meinside/loggly-go"
 )
 
 type status int16
@@ -65,20 +63,11 @@ var maintenanceMessage string
 var pool _sessionPool
 var captureChannel chan _captureRequest
 var launched time.Time
-var logger *loggly.Loggly
 var db *helper.Database
 
 const (
 	appName = "RPiCameraBot"
 )
-
-type logglyLog struct {
-	Application string      `json:"app"`
-	Severity    string      `json:"severity"`
-	Timestamp   string      `json:"timestamp"`
-	Message     string      `json:"message,omitempty"`
-	Object      interface{} `json:"obj,omitempty"`
-}
 
 // keyboards
 var allKeyboards = [][]bot.KeyboardButton{
@@ -139,13 +128,6 @@ func init() {
 
 		// channels
 		captureChannel = make(chan _captureRequest, numQueue)
-
-		// loggly
-		if config.LogglyToken != "" {
-			logger = loggly.New(config.LogglyToken)
-		} else {
-			logger = nil
-		}
 
 		// local database
 		db = helper.OpenDb()
@@ -228,7 +210,7 @@ func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
 				txt = ""
 			}
 
-			var msg, cmd string
+			var msg string
 			var options = map[string]interface{}{
 				"reply_markup": bot.ReplyKeyboardMarkup{
 					Keyboard:       allKeyboards,
@@ -243,19 +225,15 @@ func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
 				// start
 				case strings.HasPrefix(txt, conf.CommandStart):
 					msg = conf.MessageDefault
-					cmd = conf.CommandStart
 				// capture
 				case strings.HasPrefix(txt, conf.CommandCapture):
 					msg = ""
-					cmd = conf.CommandCapture
 				// status
 				case strings.HasPrefix(txt, conf.CommandStatus):
 					msg = getStatus()
-					cmd = conf.CommandStatus
 				// help
 				case strings.HasPrefix(txt, conf.CommandHelp):
 					msg = getHelp()
-					cmd = conf.CommandHelp
 				// fallback
 				default:
 					if len(txt) > 0 {
@@ -263,12 +241,8 @@ func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
 					} else {
 						msg = conf.MessageUnknownCommand
 					}
-					cmd = "unknown"
 				}
 			}
-
-			// log request
-			logRequest(userID, cmd)
 
 			if len(msg) > 0 {
 				// 'typing...'
@@ -451,49 +425,8 @@ func main() {
 
 func logMessage(format string, a ...interface{}) {
 	_stdout.Printf(format, a...)
-
-	if logger != nil {
-		_, timestamp := loggly.Timestamp()
-
-		logger.Log(logglyLog{
-			Application: appName,
-			Severity:    "Log",
-			Timestamp:   timestamp,
-			Message:     fmt.Sprintf(format, a...),
-		})
-	}
 }
 
 func logError(format string, a ...interface{}) {
 	_stderr.Printf(format, a...)
-
-	if logger != nil {
-		_, timestamp := loggly.Timestamp()
-
-		logger.Log(logglyLog{
-			Application: appName,
-			Severity:    "Error",
-			Timestamp:   timestamp,
-			Message:     fmt.Sprintf(format, a...),
-		})
-	}
-}
-
-func logRequest(username, cmd string) {
-	if logger != nil {
-		_, timestamp := loggly.Timestamp()
-
-		logger.Log(logglyLog{
-			Application: appName,
-			Severity:    "Verbose",
-			Timestamp:   timestamp,
-			Object: struct {
-				Username string `json:"username"`
-				Command  string `json:"command"`
-			}{
-				Username: username,
-				Command:  cmd,
-			},
-		})
-	}
 }
