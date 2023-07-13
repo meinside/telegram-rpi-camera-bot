@@ -137,12 +137,17 @@ func init() {
 }
 
 // check if given Telegram id is available
-func isAvailableID(id string) bool {
+func isAvailableID(id *string) bool {
+	if id == nil {
+		return false
+	}
+
 	for _, v := range availableIds {
-		if v == id {
+		if v == *id {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -174,18 +179,20 @@ func getStatus() string {
 }
 
 // process incoming update from Telegram
-func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
+func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 	// check username
-	var userID string
-	if message.From.Username == nil {
-		logError("message - user not allowed (has no username): %s", message.From.FirstName)
+	from := update.GetFrom()
+	if from != nil {
+		if !isAvailableID(from.Username) {
+			logError("[update] user not allowed: %+v", from.Username)
+			return false
+		}
+	} else {
+		logError("[update] user not allowed (has no `from`)")
 		return false
 	}
-	userID = *message.From.Username
-	if !isAvailableID(userID) {
-		logError("message - id not allowed: %s", userID)
-		return false
-	}
+
+	userID := *from.Username
 
 	// process result
 	result := false
@@ -194,12 +201,12 @@ func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
 	if session, exists := pool.Sessions[userID]; exists {
 		// XXX - for skipping duplicated update
 		// (sometimes same update is retrieved again and again due to Telegram's API error)
-		if session.LastUpdateID != updateID {
+		if session.LastUpdateID != update.UpdateID {
 			// save last update id
 			pool.Sessions[userID] = _session{
 				UserID:        session.UserID,
 				CurrentStatus: session.CurrentStatus,
-				LastUpdateID:  updateID,
+				LastUpdateID:  update.UpdateID,
 			}
 
 			// text from message
@@ -275,7 +282,7 @@ func processUpdate(b *bot.Bot, updateID int64, message bot.Message) bool {
 				}
 			}
 		} else {
-			logError("duplicated update id: %d", updateID)
+			logError("duplicated update id: %d", update.UpdateID)
 		}
 	} else {
 		logError("session does not exist for id: %s", userID)
@@ -332,18 +339,20 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 }
 
 // process inline query
-func processInlineQuery(b *bot.Bot, inlineQuery bot.InlineQuery) bool {
+func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQuery) bool {
 	// check username
-	var userID string
-	if inlineQuery.From.Username == nil {
-		logError("inline query - user not allowed (has no username): %s", inlineQuery.From.FirstName)
+	from := update.GetFrom()
+	if from != nil {
+		if !isAvailableID(from.Username) {
+			logError("[inline query] user not allowed: %+v", from.Username)
+			return false
+		}
+	} else {
+		logError("[inline query] user not allowed (has no `from`)")
 		return false
 	}
-	userID = *inlineQuery.From.Username
-	if !isAvailableID(userID) {
-		logError("inline query - id not allowed: %s", userID)
-		return false
-	}
+
+	userID := *from.Username
 
 	// retrieve cached photos,
 	photos := db.GetPhotos(userID, numLatestPhotos)
@@ -401,10 +410,10 @@ func main() {
 
 			// handle updates
 			client.SetMessageHandler(func(b *bot.Bot, update bot.Update, message bot.Message, edited bool) {
-				processUpdate(b, update.UpdateID, message)
+				processUpdate(b, update, message)
 			})
 			client.SetInlineQueryHandler(func(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQuery) {
-				processInlineQuery(b, inlineQuery)
+				processInlineQuery(b, update, inlineQuery)
 			})
 
 			// start polling
