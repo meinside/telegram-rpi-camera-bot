@@ -10,9 +10,6 @@ import (
 	"time"
 
 	bot "github.com/meinside/telegram-bot-go"
-
-	"github.com/meinside/telegram-rpi-camera-bot/conf"
-	"github.com/meinside/telegram-rpi-camera-bot/helper"
 )
 
 type status int16
@@ -63,7 +60,7 @@ var maintenanceMessage string
 var pool _sessionPool
 var captureChannel chan _captureRequest
 var launched time.Time
-var db *helper.Database
+var db *Database
 
 const (
 	appName = "RPiCameraBot"
@@ -71,8 +68,8 @@ const (
 
 // keyboards
 var allKeyboards = [][]bot.KeyboardButton{
-	bot.NewKeyboardButtons(conf.CommandCapture),
-	bot.NewKeyboardButtons(conf.CommandStatus, conf.CommandHelp),
+	bot.NewKeyboardButtons(commandCapture),
+	bot.NewKeyboardButtons(commandStatus, commandHelp),
 }
 
 // loggers
@@ -84,23 +81,23 @@ func init() {
 	launched = time.Now()
 
 	// read variables from config file
-	if config, err := helper.GetConfig(); err == nil {
-		apiToken = config.ApiToken
+	if config, err := loadConfig(); err == nil {
+		apiToken = config.APIToken
 		availableIds = config.AvailableIds
 		monitorInterval = config.MonitorInterval
 		if monitorInterval <= 0 {
-			monitorInterval = conf.DefaultMonitorIntervalSeconds
+			monitorInterval = defaultMonitorIntervalSeconds
 		}
 		isVerbose = config.IsVerbose
 
 		// image width * height
 		imageWidth = config.ImageWidth
-		if imageWidth < conf.MinImageWidth {
-			imageWidth = conf.MinImageWidth
+		if imageWidth < minImageWidth {
+			imageWidth = minImageWidth
 		}
 		imageHeight = config.ImageHeight
-		if imageHeight < conf.MinImageHeight {
-			imageHeight = conf.MinImageHeight
+		if imageHeight < minImageHeight {
+			imageHeight = minImageHeight
 		}
 
 		// other camera params
@@ -110,7 +107,7 @@ func init() {
 		isInMaintenance = config.IsInMaintenance
 		maintenanceMessage = config.MaintenanceMessage
 		if len(maintenanceMessage) <= 0 {
-			maintenanceMessage = conf.DefaultMaintenanceMessage
+			maintenanceMessage = defaultMaintenanceMessage
 		}
 
 		// initialize session variables
@@ -130,7 +127,7 @@ func init() {
 		captureChannel = make(chan _captureRequest, numQueue)
 
 		// local database
-		db = helper.OpenDb()
+		db = openDB()
 	} else {
 		panic(err)
 	}
@@ -167,15 +164,15 @@ Following commands are supported:
 
 https://github.com/meinside/telegram-rpi-camera-bot
 `,
-		conf.CommandCapture,
-		conf.CommandStatus,
-		conf.CommandHelp,
+		commandCapture,
+		commandStatus,
+		commandHelp,
 	)
 }
 
 // for showing current status of this bot
 func getStatus() string {
-	return fmt.Sprintf("Uptime: %s\nMemory Usage: %s", helper.GetUptime(launched), helper.GetMemoryUsage())
+	return fmt.Sprintf("Uptime: %s\nMemory Usage: %s", getUptime(launched), getMemoryUsage())
 }
 
 // process incoming update from Telegram
@@ -230,23 +227,23 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 			case statusWaiting:
 				switch {
 				// start
-				case strings.HasPrefix(txt, conf.CommandStart):
-					msg = conf.MessageDefault
+				case strings.HasPrefix(txt, commandStart):
+					msg = messageDefault
 				// capture
-				case strings.HasPrefix(txt, conf.CommandCapture):
+				case strings.HasPrefix(txt, commandCapture):
 					msg = ""
 				// status
-				case strings.HasPrefix(txt, conf.CommandStatus):
+				case strings.HasPrefix(txt, commandStatus):
 					msg = getStatus()
 				// help
-				case strings.HasPrefix(txt, conf.CommandHelp):
+				case strings.HasPrefix(txt, commandHelp):
 					msg = getHelp()
 				// fallback
 				default:
 					if len(txt) > 0 {
-						msg = fmt.Sprintf("*%s*: %s", txt, conf.MessageUnknownCommand)
+						msg = fmt.Sprintf("*%s*: %s", txt, messageUnknownCommand)
 					} else {
-						msg = conf.MessageUnknownCommand
+						msg = messageUnknownCommand
 					}
 				}
 			}
@@ -304,7 +301,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 	b.SendChatAction(request.ChatID, bot.ChatActionTyping, nil)
 
 	// send photo
-	if bytes, err := helper.CaptureStillImage(helper.LibCameraStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
+	if bytes, err := captureStillImage(libCameraStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
 		// captured time
 		caption := time.Now().Format("2006-01-02 (Mon) 15:04:05")
 		request.MessageOptions["caption"] = caption
@@ -316,7 +313,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
 			photo := sent.Result.LargestPhoto()
 
-			db.SavePhoto(request.UserName, photo.FileID, caption)
+			db.savePhoto(request.UserName, photo.FileID, caption)
 
 			result = true
 		} else {
@@ -355,7 +352,7 @@ func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQue
 	userID := *from.Username
 
 	// retrieve cached photos,
-	photos := db.GetPhotos(userID, numLatestPhotos)
+	photos := db.getPhotos(userID, numLatestPhotos)
 
 	if len(photos) > 0 {
 		photoResults := []interface{}{}
