@@ -19,16 +19,72 @@ and edit values to yours:
 
 ```json
 {
-	"api_token": "0123456789:abcdefghijklmnopqrstuvwyz-x-0a1b2c3d4e",
-	"available_ids": [
-		"telegram_id_1",
-		"telegram_id_2",
-		"telegram_id_3"
-	],
-	"monitor_interval": 3,
-	"image_width": 1600,
-	"image_height": 1200,
-	"is_verbose": false
+  "available_ids": [
+    "telegram_id_1",
+    "telegram_id_2",
+    "telegram_id_3"
+  ],
+  "monitor_interval": 3,
+  "image_width": 1600,
+  "image_height": 1200,
+  "is_verbose": false,
+
+  "api_token": "0123456789:abcdefghijklmnopqrstuvwyz-x-0a1b2c3d4e"
+}
+```
+
+### Using Infisical
+
+You can also use [Infisical](https://infisical.com/) for retrieving your bot api token:
+
+```json
+{
+  "available_ids": [
+    "telegram_id_1",
+    "telegram_id_2",
+    "telegram_id_3"
+  ],
+  "monitor_interval": 3,
+  "image_width": 1600,
+  "image_height": 1200,
+  "is_verbose": false,
+
+  "infisical": {
+    "workspace_id": "012345abcdefg",
+    "token": "st.xyzwabcd.0987654321.abcdefghijklmnop",
+    "environment": "dev",
+    "secret_type": "shared",
+
+    "api_token_key_path": "/path/to/your/KEY_TO_API_TOKEN"
+  }
+}
+```
+
+If your Infisical workspace's E2EE setting is enabled, you also need to provide your API key:
+
+```json
+{
+  "available_ids": [
+    "telegram_id_1",
+    "telegram_id_2",
+    "telegram_id_3"
+  ],
+  "monitor_interval": 3,
+  "image_width": 1600,
+  "image_height": 1200,
+  "is_verbose": false,
+
+  "infisical": {
+    "e2ee": true,
+    "api_key": "ak.1234567890.abcdefghijk",
+
+    "workspace_id": "012345abcdefg",
+    "token": "st.xyzwabcd.0987654321.abcdefghijklmnop",
+    "environment": "dev",
+    "secret_type": "shared",
+
+    "api_token_key_path": "/path/to/your/KEY_TO_API_TOKEN"
+  }
 }
 ```
 

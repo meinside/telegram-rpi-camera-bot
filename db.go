@@ -1,4 +1,4 @@
-package helper
+package main
 
 import (
 	"log"
@@ -31,7 +31,7 @@ type Photo struct {
 
 var _db *Database = nil
 
-func OpenDb() *Database {
+func openDB() *Database {
 	if _db == nil {
 		if execFilepath, err := os.Executable(); err != nil {
 			panic(err)
@@ -66,14 +66,14 @@ func OpenDb() *Database {
 	return _db
 }
 
-func CloseDb() {
+func closeDB() {
 	if _db != nil {
-		_db.db.Close()
+		_ = _db.db.Close()
 		_db = nil
 	}
 }
 
-func (d *Database) SavePhoto(userName, fileId, caption string) {
+func (d *Database) savePhoto(userName, fileId, caption string) {
 	d.Lock()
 
 	if stmt, err := d.db.Prepare(`insert into photos(user_name, file_id, caption) values(?, ?, ?)`); err != nil {
@@ -88,7 +88,7 @@ func (d *Database) SavePhoto(userName, fileId, caption string) {
 	d.Unlock()
 }
 
-func (d *Database) GetPhotos(userName string, latestN int) []Photo {
+func (d *Database) getPhotos(userName string, latestN int) []Photo {
 	photos := []Photo{}
 
 	d.RLock()

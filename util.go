@@ -1,4 +1,4 @@
-package helper
+package main
 
 import (
 	"bytes"
@@ -10,19 +10,21 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/meinside/infisical-go"
+	"github.com/meinside/infisical-go/helper"
 )
 
 const (
 	// constants for config
-	ConfigFilename = "config.json"
+	configFilename = "config.json"
 
-	LibCameraStillBin               = "/usr/bin/libcamera-still"
-	LibCameraStillRunTimeoutSeconds = 10
+	libCameraStillBin               = "/usr/bin/libcamera-still"
+	libCameraStillRunTimeoutSeconds = 10
 )
 
 // struct for config file
-type Config struct {
-	ApiToken           string                 `json:"api_token"`
+type config struct {
 	AvailableIds       []string               `json:"available_ids"`
 	MonitorInterval    int                    `json:"monitor_interval"`
 	ImageWidth         int                    `json:"image_width"`
@@ -31,26 +33,69 @@ type Config struct {
 	IsInMaintenance    bool                   `json:"is_in_maintenance"`
 	MaintenanceMessage string                 `json:"maintenance_message"`
 	IsVerbose          bool                   `json:"is_verbose"`
+
+	// Bot API Token,
+	APIToken string `json:"api_token,omitempty"`
+
+	// or Infisical settings
+	Infisical *struct {
+		// NOTE: When the workspace's E2EE setting is enabled, APIKey is essential for decryption
+		E2EE   bool    `json:"e2ee,omitempty"`
+		APIKey *string `json:"api_key,omitempty"`
+
+		WorkspaceID string               `json:"workspace_id"`
+		Token       string               `json:"token"`
+		Environment string               `json:"environment"`
+		SecretType  infisical.SecretType `json:"secret_type"`
+
+		APITokenKeyPath string `json:"api_token_key_path"`
+	} `json:"infisical,omitempty"`
 }
 
-// GetConfig reads config
-func GetConfig() (config Config, err error) {
+// loadConfig reads config
+func loadConfig() (conf config, err error) {
 	var execFilepath string
 	if execFilepath, err = os.Executable(); err == nil {
 		var file []byte
-		if file, err = os.ReadFile(filepath.Join(filepath.Dir(execFilepath), ConfigFilename)); err == nil {
-			var conf Config
+		if file, err = os.ReadFile(filepath.Join(filepath.Dir(execFilepath), configFilename)); err == nil {
+			var conf config
 			if err = json.Unmarshal(file, &conf); err == nil {
-				return conf, nil
+				if conf.APIToken == "" && conf.Infisical != nil {
+					var apiToken string
+
+					// read bot api token from infisical
+					if conf.Infisical.E2EE && conf.Infisical.APIKey != nil {
+						apiToken, err = helper.E2EEValue(
+							*conf.Infisical.APIKey,
+							conf.Infisical.WorkspaceID,
+							conf.Infisical.Token,
+							conf.Infisical.Environment,
+							conf.Infisical.SecretType,
+							conf.Infisical.APITokenKeyPath,
+						)
+					} else {
+						apiToken, err = helper.Value(
+							conf.Infisical.WorkspaceID,
+							conf.Infisical.Token,
+							conf.Infisical.Environment,
+							conf.Infisical.SecretType,
+							conf.Infisical.APITokenKeyPath,
+						)
+					}
+
+					conf.APIToken = apiToken
+				}
+
+				return conf, err
 			}
 		}
 	}
 
-	return Config{}, err
+	return config{}, err
 }
 
-// GetUptime gets uptime of this bot in seconds
-func GetUptime(launched time.Time) (uptime string) {
+// getUptime gets uptime of this bot in seconds
+func getUptime(launched time.Time) (uptime string) {
 	now := time.Now()
 	gap := now.Sub(launched)
 
@@ -61,16 +106,16 @@ func GetUptime(launched time.Time) (uptime string) {
 	return fmt.Sprintf("*%d* day(s) *%d* hour(s)", numDays, numHours)
 }
 
-// GetMemoryUsage gets memory usage
-func GetMemoryUsage() (usage string) {
+// getMemoryUsage gets memory usage
+func getMemoryUsage() (usage string) {
 	m := new(runtime.MemStats)
 	runtime.ReadMemStats(m)
 
 	return fmt.Sprintf("Sys: *%.1f MB*, Heap: *%.1f MB*", float32(m.Sys)/1024/1024, float32(m.HeapAlloc)/1024/1024)
 }
 
-// CaptureStillImage captures an image with `raspistill`.
-func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (result []byte, err error) {
+// captureStillImage captures an image with `raspistill`.
+func captureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (result []byte, err error) {
 	// command line arguments
 	args := []string{
 		"--width", strconv.Itoa(width),
@@ -93,7 +138,7 @@ func CaptureStillImage(libcameraStillBinPath string, width, height int, cameraPa
 	if err == nil {
 		done := make(chan error)
 		go func() { done <- cmd.Wait() }()
-		timeout := time.After(LibCameraStillRunTimeoutSeconds * time.Second)
+		timeout := time.After(libCameraStillRunTimeoutSeconds * time.Second)
 
 		// and get its standard output
 		select {
