@@ -13,6 +13,8 @@ import (
 
 	"github.com/meinside/infisical-go"
 	"github.com/meinside/infisical-go/helper"
+
+	"github.com/tailscale/hujson"
 )
 
 const (
@@ -56,30 +58,43 @@ func loadConfig() (conf config, err error) {
 	if execFilepath, err = os.Executable(); err == nil {
 		var file []byte
 		if file, err = os.ReadFile(filepath.Join(filepath.Dir(execFilepath), configFilename)); err == nil {
-			var conf config
-			if err = json.Unmarshal(file, &conf); err == nil {
-				if conf.APIToken == "" && conf.Infisical != nil {
-					var apiToken string
+			if file, err = standardizeJSON(file); err == nil {
+				var conf config
+				if err = json.Unmarshal(file, &conf); err == nil {
+					if conf.APIToken == "" && conf.Infisical != nil {
+						var apiToken string
 
-					// read bot api token from infisical
-					apiToken, err = helper.Value(
-						conf.Infisical.ClientID,
-						conf.Infisical.ClientSecret,
-						conf.Infisical.WorkspaceID,
-						conf.Infisical.Environment,
-						conf.Infisical.SecretType,
-						conf.Infisical.APITokenKeyPath,
-					)
+						// read bot api token from infisical
+						apiToken, err = helper.Value(
+							conf.Infisical.ClientID,
+							conf.Infisical.ClientSecret,
+							conf.Infisical.WorkspaceID,
+							conf.Infisical.Environment,
+							conf.Infisical.SecretType,
+							conf.Infisical.APITokenKeyPath,
+						)
 
-					conf.APIToken = apiToken
+						conf.APIToken = apiToken
+					}
+
+					return conf, err
 				}
-
-				return conf, err
 			}
 		}
 	}
 
 	return config{}, err
+}
+
+// standardize given JSON (JWCC) bytes
+func standardizeJSON(b []byte) ([]byte, error) {
+	ast, err := hujson.Parse(b)
+	if err != nil {
+		return b, err
+	}
+	ast.Standardize()
+
+	return ast.Pack(), nil
 }
 
 // getUptime gets uptime of this bot in seconds
