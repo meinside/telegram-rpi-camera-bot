@@ -101,8 +101,8 @@ $ ./telegram-rpi-camera-bot
 ### B. run as a service with systemd,
 
 ```bash
-$ sudo cp systemd/telegram-rpi-camera-bot.service /lib/systemd/system/
-$ sudo vi /lib/systemd/system/telegram-rpi-camera-bot.service
+$ sudo cp systemd/telegram-rpi-camera-bot.service /etc/systemd/system/
+$ sudo vi /etc/systemd/system/telegram-rpi-camera-bot.service
 ```
 
 and edit **User**, **Group**, **WorkingDirectory** and **ExecStart** values.
