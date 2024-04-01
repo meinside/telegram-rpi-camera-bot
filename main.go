@@ -20,6 +20,8 @@ const (
 
 	numQueue        = 4
 	numLatestPhotos = 20
+
+	resizeKeyboard = true
 )
 
 // session struct
@@ -216,11 +218,8 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 
 			var msg string
 			var options = map[string]interface{}{
-				"reply_markup": bot.ReplyKeyboardMarkup{
-					Keyboard:       allKeyboards,
-					ResizeKeyboard: true,
-				},
-				"parse_mode": bot.ParseModeMarkdown,
+				"reply_markup": replyKeyboardMarkup(resizeKeyboard),
+				"parse_mode":   bot.ParseModeMarkdown,
 			}
 
 			switch session.CurrentStatus {
@@ -385,6 +384,14 @@ func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQue
 	}
 
 	return false
+}
+
+// keyboard markup for reply
+func replyKeyboardMarkup(resize bool) bot.ReplyKeyboardMarkup {
+	return bot.ReplyKeyboardMarkup{
+		Keyboard:       allKeyboards,
+		ResizeKeyboard: &resize,
+	}
 }
 
 func main() {
