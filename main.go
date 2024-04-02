@@ -309,7 +309,7 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto, nil)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatID, bot.InputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
+		if sent := b.SendPhoto(request.ChatID, bot.NewInputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
 			photo := sent.Result.LargestPhoto()
 
 			db.savePhoto(request.UserName, photo.FileID, caption)
