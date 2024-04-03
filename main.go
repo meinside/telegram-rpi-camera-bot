@@ -217,10 +217,9 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 			}
 
 			var msg string
-			var options = map[string]interface{}{
-				"reply_markup": replyKeyboardMarkup(resizeKeyboard),
-				"parse_mode":   bot.ParseModeMarkdown,
-			}
+			options := bot.OptionsSendMessage{}.
+				SetReplyMarkup(replyKeyboardMarkup(resizeKeyboard)).
+				SetParseMode(bot.ParseModeMarkdown)
 
 			switch session.CurrentStatus {
 			case statusWaiting:
@@ -388,10 +387,8 @@ func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQue
 
 // keyboard markup for reply
 func replyKeyboardMarkup(resize bool) bot.ReplyKeyboardMarkup {
-	return bot.ReplyKeyboardMarkup{
-		Keyboard:       allKeyboards,
-		ResizeKeyboard: &resize,
-	}
+	return bot.NewReplyKeyboardMarkup(allKeyboards).
+		SetResizeKeyboard(resize)
 }
 
 func main() {
