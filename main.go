@@ -12,6 +12,10 @@ import (
 	bot "github.com/meinside/telegram-bot-go"
 )
 
+const (
+	githubPageURL = "https://github.com/meinside/telegram-rpi-camera-bot"
+)
+
 type status int16
 
 // constants
@@ -71,7 +75,7 @@ const (
 // keyboards
 var allKeyboards = [][]bot.KeyboardButton{
 	bot.NewKeyboardButtons(commandCapture),
-	bot.NewKeyboardButtons(commandStatus, commandHelp),
+	bot.NewKeyboardButtons(commandStatus, commandPrivacy, commandHelp),
 }
 
 // loggers
@@ -162,14 +166,28 @@ Following commands are supported:
 *Others*
 
 %s : show this bot's status
+%s : show this bot's privacy policy
 %s : show this help message
 
-https://github.com/meinside/telegram-rpi-camera-bot
+%s
 `,
 		commandCapture,
+
 		commandStatus,
+		commandPrivacy,
 		commandHelp,
+
+		githubPageURL,
 	)
+}
+
+// for showing privacy policy
+func getPrivacyPolicy() string {
+	return fmt.Sprintf(`
+Privacy Policy:
+
+%s/raw/master/PRIVACY.md
+`, githubPageURL)
 }
 
 // for showing current status of this bot
@@ -236,6 +254,9 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 				// help
 				case strings.HasPrefix(txt, commandHelp):
 					msg = getHelp()
+					// privacy
+				case strings.HasPrefix(txt, commandPrivacy):
+					msg = getPrivacyPolicy()
 				// fallback
 				default:
 					if len(txt) > 0 {

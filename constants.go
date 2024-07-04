@@ -14,6 +14,7 @@ const (
 	commandHelp    = "/help"
 	commandStatus  = "/status"
 	commandCancel  = "/cancel"
+	commandPrivacy = "/privacy"
 
 	// messages
 	messageDefault        = "Input your command:"
