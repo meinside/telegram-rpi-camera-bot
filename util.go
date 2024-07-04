@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/meinside/infisical-go"
-	"github.com/meinside/infisical-go/helper"
+	// infisical
+	infisical "github.com/infisical/go-sdk"
+	"github.com/infisical/go-sdk/packages/models"
 
+	// others
 	"github.com/tailscale/hujson"
 )
 
@@ -44,9 +47,9 @@ type config struct {
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
 
-		WorkspaceID string               `json:"workspace_id"`
-		Environment string               `json:"environment"`
-		SecretType  infisical.SecretType `json:"secret_type"`
+		ProjectID   string `json:"project_id"`
+		Environment string `json:"environment"`
+		SecretType  string `json:"secret_type"`
 
 		APITokenKeyPath string `json:"api_token_key_path"`
 	} `json:"infisical,omitempty"`
@@ -62,19 +65,33 @@ func loadConfig() (conf config, err error) {
 				var conf config
 				if err = json.Unmarshal(file, &conf); err == nil {
 					if conf.APIToken == "" && conf.Infisical != nil {
-						var apiToken string
+						// read bot token from infisical
+						client := infisical.NewInfisicalClient(infisical.Config{
+							SiteUrl: "https://app.infisical.com",
+						})
 
-						// read bot api token from infisical
-						apiToken, err = helper.Value(
-							conf.Infisical.ClientID,
-							conf.Infisical.ClientSecret,
-							conf.Infisical.WorkspaceID,
-							conf.Infisical.Environment,
-							conf.Infisical.SecretType,
-							conf.Infisical.APITokenKeyPath,
-						)
+						_, err = client.Auth().UniversalAuthLogin(conf.Infisical.ClientID, conf.Infisical.ClientSecret)
+						if err != nil {
+							return config{}, fmt.Errorf("failed to authenticate with Infisical: %s", err)
+						}
 
-						conf.APIToken = apiToken
+						var keyPath string
+						var secret models.Secret
+
+						// telegram bot token
+						keyPath = conf.Infisical.APITokenKeyPath
+						secret, err = client.Secrets().Retrieve(infisical.RetrieveSecretOptions{
+							ProjectID:   conf.Infisical.ProjectID,
+							Type:        conf.Infisical.SecretType,
+							Environment: conf.Infisical.Environment,
+							SecretPath:  path.Dir(keyPath),
+							SecretKey:   path.Base(keyPath),
+						})
+						if err == nil {
+							conf.APIToken = secret.SecretValue
+						} else {
+							return config{}, fmt.Errorf("failed to retrieve `api_token` from Infisical: %s", err)
+						}
 					}
 
 					return conf, err
