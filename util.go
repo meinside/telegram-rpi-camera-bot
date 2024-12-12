@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -66,9 +67,11 @@ func loadConfig() (conf config, err error) {
 				if err = json.Unmarshal(file, &conf); err == nil {
 					if conf.APIToken == "" && conf.Infisical != nil {
 						// read bot token from infisical
-						client := infisical.NewInfisicalClient(infisical.Config{
-							SiteUrl: "https://app.infisical.com",
-						})
+						client := infisical.NewInfisicalClient(
+							context.TODO(),
+							infisical.Config{
+								SiteUrl: "https://app.infisical.com",
+							})
 
 						_, err = client.Auth().UniversalAuthLogin(conf.Infisical.ClientID, conf.Infisical.ClientSecret)
 						if err != nil {
