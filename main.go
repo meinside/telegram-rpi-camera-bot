@@ -2,9 +2,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,10 @@ const (
 	numLatestPhotos = 20
 
 	resizeKeyboard = true
+
+	chatActionTimeout  = 5 * time.Second
+	sendMessageTimeout = 10 * time.Second
+	sendPhotoTimeout   = 30 * time.Second
 )
 
 // session struct
@@ -47,29 +53,27 @@ var cameraLock sync.Mutex
 // capture request
 type _captureRequest struct {
 	UserName       string
-	ChatID         interface{}
+	ChatID         any
 	ImageWidth     int
 	ImageHeight    int
-	CameraParams   map[string]interface{}
-	MessageOptions map[string]interface{}
+	CameraParams   map[string]any
+	MessageOptions map[string]any
 }
 
 // variables
-var apiToken string
-var monitorInterval int
-var isVerbose bool
-var availableIds []string
-var imageWidth, imageHeight int
-var cameraParams map[string]interface{}
-var isInMaintenance bool
-var maintenanceMessage string
-var pool _sessionPool
-var captureChannel chan _captureRequest
-var launched time.Time
-var db *Database
-
-const (
-	appName = "RPiCameraBot"
+var (
+	apiToken                string
+	monitorInterval         int
+	isVerbose               bool
+	availableIds            []string
+	imageWidth, imageHeight int
+	cameraParams            map[string]any
+	isInMaintenance         bool
+	maintenanceMessage      string
+	pool                    _sessionPool
+	captureChannel          chan _captureRequest
+	launched                time.Time
+	db                      *Database
 )
 
 // keyboards
@@ -79,8 +83,10 @@ var allKeyboards = [][]bot.KeyboardButton{
 }
 
 // loggers
-var _stdout = log.New(os.Stdout, "", log.LstdFlags)
-var _stderr = log.New(os.Stderr, "", log.LstdFlags)
+var (
+	_stdout = log.New(os.Stdout, "", log.LstdFlags)
+	_stderr = log.New(os.Stderr, "", log.LstdFlags)
+)
 
 // initialization
 func init() {
@@ -97,14 +103,8 @@ func init() {
 		isVerbose = config.IsVerbose
 
 		// image width * height
-		imageWidth = config.ImageWidth
-		if imageWidth < minImageWidth {
-			imageWidth = minImageWidth
-		}
-		imageHeight = config.ImageHeight
-		if imageHeight < minImageHeight {
-			imageHeight = minImageHeight
-		}
+		imageWidth = max(config.ImageWidth, minImageWidth)
+		imageHeight = max(config.ImageHeight, minImageHeight)
 
 		// other camera params
 		cameraParams = config.CameraParams
@@ -145,13 +145,7 @@ func isAvailableID(id *string) bool {
 		return false
 	}
 
-	for _, v := range availableIds {
-		if v == *id {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(availableIds, *id)
 }
 
 // for showing help message
@@ -269,10 +263,14 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 
 			if len(msg) > 0 {
 				// 'typing...'
-				b.SendChatAction(message.Chat.ID, bot.ChatActionTyping, nil)
+				chatActionCtx, cancel := context.WithTimeout(context.Background(), chatActionTimeout)
+				defer cancel()
+				_, _ = b.SendChatAction(chatActionCtx, message.Chat.ID, bot.ChatActionTyping, nil)
 
 				// send message
-				if sent := b.SendMessage(message.Chat.ID, msg, options); sent.Ok {
+				sendMessageCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+				defer cancel()
+				if sent, _ := b.SendMessage(sendMessageCtx, message.Chat.ID, msg, options); sent.OK {
 					result = true
 				} else {
 					logError("failed to send message: %s", *sent.Description)
@@ -280,7 +278,9 @@ func processUpdate(b *bot.Bot, update bot.Update, message bot.Message) bool {
 			} else {
 				if isInMaintenance {
 					// send message
-					if sent := b.SendMessage(message.Chat.ID, maintenanceMessage, options); sent.Ok {
+					sendMessageCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+					defer cancel()
+					if sent, _ := b.SendMessage(sendMessageCtx, message.Chat.ID, maintenanceMessage, options); sent.OK {
 						result = true
 					} else {
 						logError("failed to send maintenance message: %s", *sent.Description)
@@ -317,7 +317,9 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 	defer cameraLock.Unlock()
 
 	// 'typing...'
-	b.SendChatAction(request.ChatID, bot.ChatActionTyping, nil)
+	chatActionCtx, cancel := context.WithTimeout(context.Background(), chatActionTimeout)
+	defer cancel()
+	_, _ = b.SendChatAction(chatActionCtx, request.ChatID, bot.ChatActionTyping, nil)
 
 	// send photo
 	if bytes, err := captureStillImage(libCameraStillBin, request.ImageWidth, request.ImageHeight, request.CameraParams); err == nil {
@@ -326,10 +328,14 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		request.MessageOptions["caption"] = caption
 
 		// 'uploading photo...'
-		b.SendChatAction(request.ChatID, bot.ChatActionUploadPhoto, nil)
+		chatActionCtx, cancel := context.WithTimeout(context.Background(), chatActionTimeout)
+		defer cancel()
+		_, _ = b.SendChatAction(chatActionCtx, request.ChatID, bot.ChatActionUploadPhoto, nil)
 
 		// send photo
-		if sent := b.SendPhoto(request.ChatID, bot.NewInputFileFromBytes(bytes), request.MessageOptions); sent.Ok {
+		sendPhotoCtx, cancel := context.WithTimeout(context.Background(), sendPhotoTimeout)
+		defer cancel()
+		if sent, _ := b.SendPhoto(sendPhotoCtx, request.ChatID, bot.NewInputFileFromBytes(bytes), request.MessageOptions); sent.OK {
 			photo := sent.Result.LargestPhoto()
 
 			db.savePhoto(request.UserName, photo.FileID, caption)
@@ -338,17 +344,21 @@ func processCaptureRequest(b *bot.Bot, request _captureRequest) bool {
 		} else {
 			msg := fmt.Sprintf("Failed to send photo: %s", *sent.Description)
 
-			logError(msg)
+			logError("%s", msg)
 
 			// send error message
-			b.SendMessage(request.ChatID, msg, nil)
+			sendMessageCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+			defer cancel()
+			_, _ = b.SendMessage(sendMessageCtx, request.ChatID, msg, nil)
 		}
 	} else {
 		message := fmt.Sprintf("Image capture failed: %s", err)
 
-		logError(message)
+		logError("%s", message)
 
-		b.SendMessage(request.ChatID, message, request.MessageOptions)
+		sendMessageCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+		defer cancel()
+		_, _ = b.SendMessage(sendMessageCtx, request.ChatID, message, request.MessageOptions)
 	}
 
 	return result
@@ -374,7 +384,7 @@ func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQue
 	photos := db.getPhotos(userID, numLatestPhotos)
 
 	if len(photos) > 0 {
-		photoResults := []interface{}{}
+		photoResults := []any{}
 
 		// build up inline query results with cached photos,
 		for _, photo := range photos {
@@ -388,13 +398,16 @@ func processInlineQuery(b *bot.Bot, update bot.Update, inlineQuery bot.InlineQue
 		}
 
 		// then answer inline query
-		sent := b.AnswerInlineQuery(
+		answerQueryCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+		defer cancel()
+		sent, _ := b.AnswerInlineQuery(
+			answerQueryCtx,
 			inlineQuery.ID,
 			photoResults,
 			nil,
 		)
 
-		if sent.Ok {
+		if sent.OK {
 			return true
 		}
 
@@ -417,11 +430,15 @@ func main() {
 	client.Verbose = isVerbose
 
 	// get info about this bot
-	if me := client.GetMe(); me.Ok {
+	getMeCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+	defer cancel()
+	if me, _ := client.GetMe(getMeCtx); me.OK {
 		logMessage("starting bot: @%s (%s)", *me.Result.Username, me.Result.FirstName)
 
 		// delete webhook (getting updates will not work when wehbook is set up)
-		if unhooked := client.DeleteWebhook(false); unhooked.Ok {
+		deleteWebhookCtx, cancel := context.WithTimeout(context.Background(), sendMessageTimeout)
+		defer cancel()
+		if unhooked, _ := client.DeleteWebhook(deleteWebhookCtx, false); unhooked.OK {
 			// monitor request capture channel
 			go func() {
 				for request := range captureChannel {
@@ -454,10 +471,10 @@ func main() {
 	}
 }
 
-func logMessage(format string, a ...interface{}) {
+func logMessage(format string, a ...any) {
 	_stdout.Printf(format, a...)
 }
 
-func logError(format string, a ...interface{}) {
+func logError(format string, a ...any) {
 	_stderr.Printf(format, a...)
 }
