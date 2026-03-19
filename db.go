@@ -1,13 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -79,7 +78,7 @@ func (d *Database) savePhoto(userName, fileId, caption string) {
 	if stmt, err := d.db.Prepare(`insert into photos(user_name, file_id, caption) values(?, ?, ?)`); err != nil {
 		log.Printf("* Failed to prepare a statement: %s\n", err.Error())
 	} else {
-		defer stmt.Close()
+		defer func() { _ = stmt.Close() }()
 		if _, err = stmt.Exec(userName, fileId, caption); err != nil {
 			log.Printf("* Failed to save photo into local database: %s\n", err.Error())
 		}
@@ -96,12 +95,12 @@ func (d *Database) getPhotos(userName string, latestN int) []Photo {
 	if stmt, err := d.db.Prepare(`select user_name, file_id, caption, datetime(time, 'localtime') as time from photos where user_name = ? order by id desc limit ?`); err != nil {
 		log.Printf("* Failed to prepare a statement: %s\n", err.Error())
 	} else {
-		defer stmt.Close()
+		defer func() { _ = stmt.Close() }()
 
 		if rows, err := stmt.Query(userName, latestN); err != nil {
 			log.Printf("* Failed to select photos from local database: %s\n", err.Error())
 		} else {
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 
 			var userName, fileId, caption, datetime string
 			var tm time.Time

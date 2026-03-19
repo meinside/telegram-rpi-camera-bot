@@ -31,14 +31,14 @@ const (
 
 // struct for config file
 type config struct {
-	AvailableIds       []string               `json:"available_ids"`
-	MonitorInterval    int                    `json:"monitor_interval"`
-	ImageWidth         int                    `json:"image_width"`
-	ImageHeight        int                    `json:"image_height"`
-	CameraParams       map[string]interface{} `json:"camera_params"`
-	IsInMaintenance    bool                   `json:"is_in_maintenance"`
-	MaintenanceMessage string                 `json:"maintenance_message"`
-	IsVerbose          bool                   `json:"is_verbose"`
+	AvailableIds       []string       `json:"available_ids"`
+	MonitorInterval    int            `json:"monitor_interval"`
+	ImageWidth         int            `json:"image_width"`
+	ImageHeight        int            `json:"image_height"`
+	CameraParams       map[string]any `json:"camera_params"`
+	IsInMaintenance    bool           `json:"is_in_maintenance"`
+	MaintenanceMessage string         `json:"maintenance_message"`
+	IsVerbose          bool           `json:"is_verbose"`
 
 	// Bot API Token,
 	APIToken string `json:"api_token,omitempty"`
@@ -138,7 +138,11 @@ func getMemoryUsage() (usage string) {
 }
 
 // captureStillImage captures an image with `raspistill`.
-func captureStillImage(libcameraStillBinPath string, width, height int, cameraParams map[string]interface{}) (result []byte, err error) {
+func captureStillImage(
+	libcameraStillBinPath string,
+	width, height int,
+	cameraParams map[string]any,
+) (result []byte, err error) {
 	// command line arguments
 	args := []string{
 		"--width", strconv.Itoa(width),
@@ -168,15 +172,15 @@ func captureStillImage(libcameraStillBinPath string, width, height int, cameraPa
 		case <-timeout:
 			err = cmd.Process.Kill()
 			if err == nil {
-				err = fmt.Errorf("Command timed out: %s", libcameraStillBinPath)
+				err = fmt.Errorf("command timed out: %s", libcameraStillBinPath)
 			} else {
-				err = fmt.Errorf("Command timed out, but failed to kill process: %s", libcameraStillBinPath)
+				err = fmt.Errorf("command timed out, but failed to kill process: %s", libcameraStillBinPath)
 			}
 		case err = <-done:
 			if err == nil {
 				return buffer.Bytes(), nil
 			} else {
-				err = fmt.Errorf("Error running %s: %s", libcameraStillBinPath, err)
+				err = fmt.Errorf("error running %s: %s", libcameraStillBinPath, err)
 			}
 		}
 	}
